@@ -1,5 +1,5 @@
 name: lgtm
-description: "A new Flutter project."
+description: "LGTM: Tinder-like app for group decisions."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -56,6 +56,31 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  fonts:
+    - family: Vollkorn
+      fonts:
+        - asset: assets/fonts/Vollkorn-500.ttf
+          weight: 500
+        - asset: assets/fonts/Vollkorn-600.ttf
+          weight: 600
+        - asset: assets/fonts/Vollkorn-700.ttf
+          weight: 700
+        - asset: assets/fonts/Vollkorn-700Italic.ttf
+          weight: 700
+          style: italic
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-300.ttf
+          weight: 300
+        - asset: assets/fonts/PlusJakartaSans-400.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-500.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-600.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-700.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

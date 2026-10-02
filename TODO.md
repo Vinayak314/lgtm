@@ -11,9 +11,9 @@ Work is split into two balanced, end-to-end tracks. Each team member owns fronte
 - [ ] Add shared loading, error, empty, offline, and confirmation states.
 - [ ] Build Splash and auth-state loading screens.
 - [ ] Build Login and Sign Up forms with validation, password visibility, and readable errors.
-- [ ] Build the My Groups hub with group cards, Create, and Join by code actions.
-- [ ] Build Create Group and Join Group forms.
-- [ ] Build Group Detail with member list, invite code/share action, session history entry point, and Start Session action.
+- [x] Build the My Groups hub with group cards, Create, and Join by code actions.
+- [x] Build Create Group and Join Group forms.
+- [x] Build Group Detail with member list, invite code/share action, session history entry point, and Start Session action.
 - [ ] Add Profile / Settings UI with display name and logout action.
 - [ ] Connect foundation, auth, and group screens to app state and loading/error states using mock data first.
 - [ ] Check responsive layouts, accessibility labels, and keyboard behavior for these screens.
