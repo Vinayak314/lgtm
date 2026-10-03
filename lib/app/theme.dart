@@ -67,14 +67,33 @@ abstract final class LgtmTheme {
         behavior: SnackBarBehavior.floating,
         shape: const RoundedRectangleBorder(borderRadius: LgtmRadius.card),
       ),
-      dialogTheme: const DialogThemeData(
-        backgroundColor: LgtmColors.card,
+      dialogTheme: DialogThemeData(
+        backgroundColor: LgtmColors.bg,
         surfaceTintColor: Colors.transparent,
+        // Soft only. Material draws a dialog shadow from a fixed
+        // elevation-to-shadow table rather than from a shadow of its own, so 8
+        // is the closest the framework gets to the 0 / 8 / 24 in the design,
+        // and the shadow colour is the 12% black it asks for.
+        elevation: 8,
+        shadowColor: const Color(0x1F000000),
+        barrierColor: const Color(0x801C1B1A),
+        alignment: Alignment.center,
+        insetPadding: const EdgeInsets.all(LgtmLayout.gutter),
+        constraints: const BoxConstraints(maxWidth: 320),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(20)),
+          borderRadius: const BorderRadius.all(Radius.circular(28)),
+          side: const BorderSide(color: LgtmColors.roseBorder),
         ),
-        titleTextStyle: LgtmSerif.title,
-        contentTextStyle: LgtmSans.body,
+        // Set explicitly: a style with no colour picks up whatever the ambient
+        // text colour happens to be, which is how the title and body ended up
+        // white on this cream.
+        titleTextStyle: LgtmSerif.title.copyWith(color: LgtmColors.ink),
+        contentTextStyle: LgtmSans.body.copyWith(
+          color: LgtmColors.inkMuted,
+          fontSize: 15,
+          height: 22 / 15,
+        ),
+        actionsPadding: const EdgeInsets.all(LgtmLayout.gutter),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: LgtmColors.bg,

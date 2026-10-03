@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/sign_up_screen.dart';
-import '../screens/dev/foundation_preview.dart';
 import '../screens/groups/create_group_screen.dart';
 import '../screens/groups/group_detail_screen.dart';
 import '../screens/groups/groups_hub_screen.dart';
@@ -37,11 +36,6 @@ abstract final class LgtmRoutes {
   static const groupDetail = '/groups/detail';
 
   static const profile = '/profile';
-
-  /// The design system showcase. Not part of the product flow: it exists so
-  /// the shared components can be reviewed on a device, and goes away with
-  /// `lib/screens/dev` once they are settled.
-  static const designPreview = '/dev/preview';
 }
 
 /// Arguments for [LgtmRoutes.signUp].
@@ -115,9 +109,6 @@ Route<Object?> lgtmGenerateRoute(RouteSettings settings) {
 
     case LgtmRoutes.profile:
       return _page(settings, const ProfileScreen());
-
-    case LgtmRoutes.designPreview:
-      return _page(settings, const FoundationPreviewScreen());
 
     default:
       return _page(settings, NotFoundScreen(path: settings.name));

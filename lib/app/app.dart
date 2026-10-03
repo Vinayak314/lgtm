@@ -14,6 +14,8 @@ class LgtmApp extends StatefulWidget {
     this.initialRoute = LgtmRoutes.splash,
     this.groupsStore,
     this.session,
+    this.authRepository,
+    this.groupsRepository,
   });
 
   /// Overridden by tests to open straight onto a screen.
@@ -25,19 +27,57 @@ class LgtmApp extends StatefulWidget {
   /// Overridden by tests that need to start already signed in, or signed out.
   final LgtmSession? session;
 
+  /// Where auth is stored. `main.dart` passes Firebase Auth; left out, as in
+  /// every test, the in-memory mock is used, which is why the app also runs
+  /// with no Firebase project behind it.
+  final LgtmAuthRepository? authRepository;
+
+  /// Where groups are stored, with the same fallback as [authRepository].
+  final LgtmGroupsRepository? groupsRepository;
+
   @override
   State<LgtmApp> createState() => _LgtmAppState();
 }
 
 class _LgtmAppState extends State<LgtmApp> {
-  /// One session for the life of the app. The real one is built here when the
-  /// Firebase work in TODO.md lands; every screen reads it through
+  /// One session for the life of the app. Every screen reads it through
   /// [LgtmSessionScope].
-  late final LgtmSession _session = widget.session ?? LgtmSession();
+  late final LgtmSession _session =
+      widget.session ?? LgtmSession(repository: widget.authRepository);
 
-  /// Same story for the groups: one mock store for the whole app, shared with
-  /// every route through [LgtmGroupsScope].
-  late final LgtmGroupsStore _groups = widget.groupsStore ?? LgtmGroupsStore();
+  /// Same story for the groups: one store for the whole app, shared with every
+  /// route through [LgtmGroupsScope].
+  late final LgtmGroupsStore _groups =
+      widget.groupsStore ??
+      LgtmGroupsStore(repository: widget.groupsRepository);
+
+  @override
+  void initState() {
+    super.initState();
+    // The signed in person is who the hub marks as "you", and in the database
+    // that person is a uid. Watching the session keeps the two in step without
+    // either screen knowing the other exists.
+    _session.addListener(_followSignedInUser);
+    _followSignedInUser();
+  }
+
+  @override
+  void dispose() {
+    _session.removeListener(_followSignedInUser);
+    _session.dispose();
+    _groups.dispose();
+    super.dispose();
+  }
+
+  /// Puts the signed in person in the groups store as its current member.
+  ///
+  /// The mock store keeps its own member, which is why nothing happens while a
+  /// test runs on the mock: a user with no uid cannot be a real member.
+  void _followSignedInUser() {
+    final user = _session.user;
+    if (user == null || user.uid.isEmpty) return;
+    _groups.setCurrentMember(LgtmMember.fromUser(user));
+  }
 
   @override
   Widget build(BuildContext context) {

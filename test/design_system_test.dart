@@ -34,13 +34,27 @@ void main() {
     expect(canvas.color, LgtmColors.bg);
   });
 
+  /// Opens the My Groups hub and waits for the mock read to land, so the
+  /// assertions below look at a built screen rather than a spinner.
+  Future<void> openHub(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const LgtmApp(initialRoute: LgtmRoutes.groups));
+    for (
+      var i = 0;
+      i < 12 && find.text('ACTIVE MEMBERS').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+  }
+
   testWidgets('bundled serif and sans fonts are used', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(
-      const LgtmApp(initialRoute: LgtmRoutes.designPreview),
-    );
-    await tester.pump();
+    await openHub(tester);
 
     final serif = tester.widget<Text>(find.text('LGTM').first);
     expect(serif.style!.fontFamily, 'Vollkorn');
@@ -53,10 +67,7 @@ void main() {
   testWidgets('bottom nav highlights the active tab with the crimson label', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(
-      const LgtmApp(initialRoute: LgtmRoutes.designPreview),
-    );
-    await tester.pump();
+    await openHub(tester);
 
     final groups = tester.widget<Text>(find.text('Groups'));
     final swipe = tester.widget<Text>(find.text('Swipe'));
@@ -96,10 +107,7 @@ void main() {
   testWidgets('top bar leads with the hamburger, never a second wordmark', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(
-      const LgtmApp(initialRoute: LgtmRoutes.designPreview),
-    );
-    await tester.pump();
+    await openHub(tester);
 
     expect(find.byType(LgtmMenuButton), findsOneWidget);
 

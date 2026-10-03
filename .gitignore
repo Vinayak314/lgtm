@@ -30,8 +30,38 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+build/
 /coverage/
+
+# Secrets and per machine config. None of this belongs in the repo: the Firebase
+# config files name the project and are downloaded per machine, a service
+# account can do anything to it, and signing material can produce a build that
+# is not yours to ship.
+.env
+.env.*
+!.env.example
+**/google-services.json
+**/GoogleService-Info.plist
+**/key.properties
+**/*.jks
+**/*.keystore
+**/local.properties
+**/*service-account*.json
+**/*serviceAccount*.json
+**/*service_account*.json
+**/*firebase-adminsdk*.json
+# A private key from Project settings -> Service accounts -> Generate new
+# private key downloads as <project-id>-<random>.json, so name that too.
+**/lgtm-app-*.json
+
+# Firebase CLI logs
+firebase-debug.log
+firebase-debug.*.log
+*-debug.log
+
+# Local handoff notes. Written for one person on one chat, never for the
+# repo.
+TEAMMATE_HANDOFF.md
 
 # Symbolication related
 app.*.symbols
@@ -46,3 +76,10 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Firebase rules test tooling
+tool/rules/node_modules/
+tool/rules/package-lock.json
+
+# Firebase local state
+.firebase/

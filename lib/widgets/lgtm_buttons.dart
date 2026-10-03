@@ -22,6 +22,7 @@ class LgtmPrimaryButton extends StatelessWidget {
     this.fill = LgtmColors.primary,
     this.shadows,
     this.expand = true,
+    this.padding = const EdgeInsets.symmetric(horizontal: 20),
   });
 
   final String label;
@@ -38,6 +39,9 @@ class LgtmPrimaryButton extends StatelessWidget {
   final Color fill;
   final List<BoxShadow>? shadows;
   final bool expand;
+
+  /// Space inside the button around the label. Dialog actions set 24.
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -81,10 +85,7 @@ class LgtmPrimaryButton extends StatelessWidget {
             borderRadius: radius,
             child: SizedBox(
               height: height,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: content,
-              ),
+              child: Padding(padding: padding, child: content),
             ),
           ),
         ),

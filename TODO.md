@@ -20,12 +20,13 @@ Work is split into two balanced, end-to-end tracks. Each team member owns fronte
 - [x] Add app icon and launcher branding.
 
 ### Backend
-- [ ] Add null-safe user and group models with JSON conversion.
-- [ ] Add Provider state for auth and groups.
-- [ ] Configure Firebase and initialize it in the app.
-- [ ] Implement email/password sign up, login, logout, and auth-state routing.
-- [ ] Implement group creation, invite-code joining, group listing, and member data in Realtime Database.
-- [ ] Add and validate Realtime Database security rules for users and groups.
+- [x] Add null-safe user and group models with JSON conversion.
+- [x] Add Provider state for auth and groups.
+- [x] Configure Firebase and initialize it in the app.
+- [x] Implement email/password sign up, login, logout, and auth-state routing.
+- [x] Implement group creation, invite-code joining, group listing, and member data in Realtime Database.
+- [x] Add and validate Realtime Database security rules for users and groups.
+- [ ] Run the app on a device against the live project: sign up, sign in, update a name, create a group, join one with an invite code.
 
 ## Team Member 2: Vinayak (Session setup, live play, and results)
 

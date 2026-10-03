@@ -51,32 +51,39 @@ class _ConfirmDialog extends StatelessWidget {
     return AlertDialog(
       title: Text(title),
       content: Text(message),
-      actionsPadding: const EdgeInsets.fromLTRB(
+      // 12 between the title and the body. The space down to the buttons is the
+      // theme's actions padding, so every dialog keeps the same rhythm.
+      contentPadding: const EdgeInsets.fromLTRB(
+        LgtmLayout.gutter,
+        12,
         LgtmLayout.gutter,
         0,
-        LgtmLayout.gutter,
-        LgtmLayout.gutter,
       ),
       actions: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Expanded(
+            // Flexible so a long label or a large text scale shrinks the pair
+            // rather than overflowing the dialog.
+            Flexible(
               child: TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
                 child: Text(cancelLabel),
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(
+            Flexible(
               child: LgtmPrimaryButton(
                 label: confirmLabel,
-                height: 48,
-                fill: destructive ? LgtmColors.reject : LgtmColors.primary,
+                height: 44,
+                // Brand crimson either way, as the design has it, so the
+                // destructive half only decides whether it carries a shadow.
+                fill: LgtmColors.primary,
                 onPressed: () => Navigator.of(context).pop(true),
-                shadows: destructive
-                    ? LgtmShadow.rejectHard
-                    : LgtmShadow.primarySoft,
-                labelStyle: LgtmSerif.cta,
+                shadows: destructive ? const [] : LgtmShadow.primarySoft,
+                labelStyle: LgtmSerif.cta.copyWith(fontSize: 16),
+                expand: false,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
               ),
             ),
           ],

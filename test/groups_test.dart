@@ -96,10 +96,17 @@ const _outsider = LgtmMember(
 
 void main() {
   group('groups store', () {
-    test('starts not ready, with the mock groups', () {
+    test('starts not ready and empty, then holds the mock groups', () async {
       final store = fastStore();
 
+      // Nothing is known until the read lands, so a screen cannot show a
+      // half empty hub.
       expect(store.isReady, isFalse);
+      expect(store.groups, isEmpty);
+
+      await store.load();
+
+      expect(store.isReady, isTrue);
       expect(store.groups.map((group) => group.name), [
         'Roommates',
         'Hackathon Squad',

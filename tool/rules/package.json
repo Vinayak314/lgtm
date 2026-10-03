@@ -1,0 +1,13 @@
+{
+  "name": "lgtm-rules-test",
+  "private": true,
+  "type": "module",
+  "description": "Realtime Database security rules tests for LGTM",
+  "scripts": {
+    "test": "node rules_test.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.14.0"
+  }
+}

@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Downloaded from the Firebase console, per machine. See the Setup section of
+# README.md.
+google-services.json

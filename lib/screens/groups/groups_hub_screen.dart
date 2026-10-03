@@ -12,6 +12,7 @@ import '../../widgets/lgtm_pill.dart';
 import '../../widgets/lgtm_top_bar.dart';
 import '../../widgets/lgtm_winner_row.dart';
 import '../../widgets/states/lgtm_empty_state.dart';
+import '../../widgets/states/lgtm_error_state.dart';
 import '../../widgets/states/lgtm_loading_state.dart';
 
 /// My Groups, the signed in landing page.
@@ -102,6 +103,18 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
   Widget _body(LgtmGroupsStore store) {
     if (!store.isReady) {
       return const LgtmLoadingState(label: 'Loading your groups...');
+    }
+
+    // A failed read lands here instead of the empty state, so "we could not
+    // load it" never looks like "you have nothing".
+    final failure = store.error;
+    if (failure != null) {
+      return LgtmErrorState(
+        title: "Couldn't load your groups",
+        message: failure,
+        retryLabel: 'Retry',
+        onRetry: store.retry,
+      );
     }
 
     final groups = store.groups;

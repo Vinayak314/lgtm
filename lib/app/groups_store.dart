@@ -1,109 +1,57 @@
-import 'dart:math';
+import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'package:provider/provider.dart';
 
-/// One person in a group.
+import '../data/groups_repository.dart';
+import '../data/in_memory_groups_repository.dart';
+
+export '../data/groups_repository.dart';
+
+/// The groups the signed in person belongs to, held for the life of the app.
 ///
-/// [avatarColor] stands in for the member's photo until the real image URLs
-/// arrive with the Firebase work.
-class LgtmMember {
-  const LgtmMember({
-    required this.id,
-    required this.displayName,
-    required this.avatarColor,
-  });
-
-  final String id;
-  final String displayName;
-  final Color avatarColor;
-}
-
-/// What a group is for. Decides the icon on its card.
-enum LgtmGroupKind { home, work }
-
-/// A session the group already finished: what they were deciding, what they
-/// agreed on, and when.
-class LgtmGroupSession {
-  const LgtmGroupSession({
-    required this.id,
-    required this.activity,
-    required this.winnerName,
-    required this.winnerIcon,
-    required this.date,
-  });
-
-  final String id;
-  final String activity;
-  final String winnerName;
-
-  /// Placeholder glyph for the winning option. The real card shows a photo
-  /// once the option models land.
-  final IconData winnerIcon;
-  final String date;
-}
-
-/// A group: its invite code, its members and its finished sessions.
-class LgtmGroup {
-  const LgtmGroup({
-    required this.id,
-    required this.name,
-    required this.kind,
-    required this.inviteCode,
-    required this.members,
-    required this.sessions,
-  });
-
-  final String id;
-  final String name;
-  final LgtmGroupKind kind;
-  final String inviteCode;
-  final List<LgtmMember> members;
-  final List<LgtmGroupSession> sessions;
-
-  /// The link a member can share. Matches the invite URL in the design.
-  String get inviteLink => 'lgtm.app/invite/$inviteCode';
-
-  /// The three most recent wins, which is what the hub card shows.
-  List<LgtmGroupSession> get recentWinners => sessions.take(3).toList();
-
-  bool get hasWinners => sessions.isNotEmpty;
-
-  LgtmGroup copyWith({List<LgtmMember>? members}) => LgtmGroup(
-    id: id,
-    name: name,
-    kind: kind,
-    inviteCode: inviteCode,
-    members: members ?? this.members,
-    sessions: sessions,
-  );
-}
-
-/// The groups the signed in person belongs to, held in memory for the life of
-/// the app.
+/// This is the state Provider watches, and the only thing screens talk to for
+/// groups: they read it through [LgtmGroupsScope]. It owns the view state
+/// (loading, busy, the last failure) and asks an [LgtmGroupsRepository] for
+/// the data, so the Realtime Database implementation can slot in without a
+/// screen changing.
 ///
-/// This is deliberately a mock, exactly like [LgtmSession]: Realtime Database,
-/// security rules and persistence are the backend items in TODO.md, so nothing
-/// here touches the network or the disk. Screens only ever talk to this
-/// object, so the real repository can slot in without touching a screen.
+/// With no repository passed in it builds the in-memory mock, which is why the
+/// app still runs with no Firebase project.
 class LgtmGroupsStore extends ChangeNotifier {
   /// Builds a store. [seed] replaces the mock groups, so tests can start from
-  /// a known list (or an empty one).
+  /// a known list (or an empty one), and [repository] swaps the storage out.
   LgtmGroupsStore({
     this.delay = const Duration(milliseconds: 600),
+    this.timeout = firstLoadTimeout,
     List<LgtmGroup>? seed,
     LgtmMember? currentMember,
-  }) : _groups = [...seed ?? _mockGroups()],
-       currentMember = currentMember ?? _mockCurrentMember;
+    LgtmGroupsRepository? repository,
+  }) : _currentMember = currentMember ?? lgtmMockMember,
+       _repository =
+           repository ?? LgtmInMemoryGroupsRepository(delay: delay, seed: seed);
 
-  /// How long [load], [createGroup] and [joinWithCode] pretend to take.
+  /// How long the mock takes. Ignored when a [repository] is passed in, which
+  /// has its own idea of how long a read costs.
   final Duration delay;
 
-  /// The signed in member. A mock until the real profile exists; the member
-  /// lists mark this row as you.
-  final LgtmMember currentMember;
+  /// How long the first load may take before it is called a failure. A spinner
+  /// with no ceiling is the same as a spinner that never ends.
+  static const firstLoadTimeout = Duration(seconds: 10);
 
-  final List<LgtmGroup> _groups;
+  /// The ceiling on one load, [firstLoadTimeout] unless a test wants it faster.
+  final Duration timeout;
+
+  LgtmMember _currentMember;
+
+  /// The signed in member. The member lists mark this row as you, and every
+  /// read is scoped to this member's uid.
+  LgtmMember get currentMember => _currentMember;
+
+  final LgtmGroupsRepository _repository;
+  List<LgtmGroup> _groups = [];
   bool _ready = false;
+  bool _loading = false;
   bool _busy = false;
   String? _error;
 
@@ -130,13 +78,45 @@ class LgtmGroupsStore extends ChangeNotifier {
     return null;
   }
 
-  /// Loads the groups once. The hub calls this on its first build; calling it
-  /// again does nothing.
+  /// Loads the groups once. The app shell calls this at launch so any screen
+  /// can count groups without being the one that fetched them; the hub calls
+  /// it again on its first build, which does nothing.
+  ///
+  /// A read that fails still ends the loading state, otherwise the hub would
+  /// sit on its spinner forever. The reason lands in [error].
+  ///
+  /// Three things end it, in every case: the read, the [timeout], or any error
+  /// at all. Nothing is allowed to leave this method without setting [isReady].
   Future<void> load() async {
-    if (_ready) return;
-    await Future<void>.delayed(delay);
-    _ready = true;
+    if (_ready || _loading) return;
+    _loading = true;
+
+    try {
+      _groups = await _repository
+          .loadGroups(member: currentMember)
+          .timeout(timeout);
+    } on TimeoutException {
+      _error = 'LGTM did not answer in time.';
+    } on LgtmGroupsException catch (failure) {
+      _error = failure.message;
+    } catch (failure) {
+      // The safety net: an error type the repository did not name still ends the
+      // loading state and still says why.
+      _error = 'Something went wrong loading your groups.';
+    } finally {
+      _loading = false;
+      _ready = true;
+      notifyListeners();
+    }
+  }
+
+  /// Throws the last failure away and reads again, which is what the hub's
+  /// Retry does.
+  Future<void> retry() async {
+    _error = null;
+    _ready = false;
     notifyListeners();
+    await load();
   }
 
   /// Creates a group owned by [currentMember] and puts it at the top of the
@@ -146,21 +126,20 @@ class LgtmGroupsStore extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    await Future<void>.delayed(delay);
-
-    final group = LgtmGroup(
-      id: 'g${_groups.length + 1}',
-      name: name.trim(),
-      kind: LgtmGroupKind.home,
-      inviteCode: _newInviteCode(),
-      members: [currentMember],
-      sessions: const [],
-    );
-    _groups.insert(0, group);
-
-    _busy = false;
-    notifyListeners();
-    return group;
+    try {
+      final group = await _repository.createGroup(
+        name: name,
+        member: currentMember,
+      );
+      _groups = [group, ..._groups];
+      return group;
+    } on LgtmGroupsException catch (failure) {
+      _error = failure.message;
+      rethrow;
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
   }
 
   /// Joins with an invite code. Returns true when the group is in the hub
@@ -170,41 +149,53 @@ class LgtmGroupsStore extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    await Future<void>.delayed(delay);
-
-    final wanted = code.trim().toLowerCase();
-    LgtmGroup? match;
-    for (final group in _groups) {
-      if (group.inviteCode.toLowerCase() == wanted) {
-        match = group;
-        break;
-      }
-    }
-
-    if (match == null) {
-      _busy = false;
-      _error =
-          'We could not find a group with that code. Check it and try '
-          'again.';
-      notifyListeners();
-      return false;
-    }
-
-    if (isMember(match)) {
-      _busy = false;
-      notifyListeners();
+    try {
+      final joined = await _repository.joinWithCode(
+        code: code,
+        member: currentMember,
+      );
+      _applyJoined(joined);
       return true;
+    } on LgtmGroupsException catch (failure) {
+      _error = failure.message;
+      return false;
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
+  /// Puts [joined] where the member would expect to find it: at the top when
+  /// they just joined, back where it was when they were already in it.
+  ///
+  /// Always builds a new list: what [load] took from the repository is the
+  /// repository's read only copy, and nothing here may edit it.
+  void _applyJoined(LgtmGroup joined) {
+    final index = _groups.indexWhere((group) => group.id == joined.id);
+    if (index < 0) {
+      _groups = [joined, ..._groups];
+      return;
     }
 
-    _groups.remove(match);
-    _groups.insert(
-      0,
-      match.copyWith(members: [...match.members, currentMember]),
-    );
+    final wasAlreadyIn = isMember(_groups[index]);
+    final reordered = [..._groups]..removeAt(index);
+    _groups = [...reordered]..insert(wasAlreadyIn ? index : 0, joined);
+  }
 
-    _busy = false;
+  /// Points the store at whoever is signed in now.
+  ///
+  /// Anything already read was read for the old member, so it is dropped and
+  /// the next screen that needs data reads it again for the new one. Called
+  /// when the session changes, which is why nothing here has to know about
+  /// auth.
+  void setCurrentMember(LgtmMember member) {
+    if (member.id == _currentMember.id) return;
+
+    _currentMember = member;
+    _groups = [];
+    _ready = false;
+    _error = null;
     notifyListeners();
-    return true;
   }
 
   /// Clears the last failure message once the form has been edited.
@@ -213,110 +204,29 @@ class LgtmGroupsStore extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
-
-  /// Invite codes avoid the characters people misread (0/O, 1/I/L) so a code
-  /// can be read out loud over a table.
-  static const _alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-
-  String _newInviteCode() {
-    final random = Random();
-    return String.fromCharCodes(
-      List<int>.generate(
-        5,
-        (_) => _alphabet.codeUnitAt(random.nextInt(_alphabet.length)),
-      ),
-    );
-  }
 }
 
-const _mockCurrentMember = LgtmMember(
-  id: 'u0',
-  displayName: 'Purva',
-  avatarColor: Color(0xFF4A4A4A),
-);
+/// Makes the one [LgtmGroupsStore] available to every route through Provider.
+///
+/// A thin adapter over `ChangeNotifierProvider`, so screens keep calling
+/// [LgtmGroupsScope.of] and Provider stays the source of truth: whichever scope
+/// is nearest wins, and nothing else has to be threaded through the tree.
+class LgtmGroupsScope extends StatelessWidget {
+  const LgtmGroupsScope({super.key, required this.store, required this.child});
 
-/// The groups the app starts with, straight from the design: Roommates with
-/// three finished sessions, and Hackathon Squad with none.
-List<LgtmGroup> _mockGroups() => [
-  LgtmGroup(
-    id: 'g1',
-    name: 'Roommates',
-    kind: LgtmGroupKind.home,
-    inviteCode: 'vYzA1',
-    members: const [
-      _mockCurrentMember,
-      LgtmMember(
-        id: 'u1',
-        displayName: 'Nikhil',
-        avatarColor: Color(0xFF2F5D5B),
-      ),
-      LgtmMember(
-        id: 'u2',
-        displayName: 'Aisha',
-        avatarColor: Color(0xFF4B3F63),
-      ),
-      LgtmMember(id: 'u3', displayName: 'Dev', avatarColor: Color(0xFF5B4A3A)),
-    ],
-    sessions: const [
-      LgtmGroupSession(
-        id: 's1',
-        activity: 'Dinner',
-        winnerName: 'Taco Bell',
-        winnerIcon: Icons.lunch_dining,
-        date: '12 Mar',
-      ),
-      LgtmGroupSession(
-        id: 's2',
-        activity: 'Lunch',
-        winnerName: 'Sushi Zen',
-        winnerIcon: Icons.ramen_dining,
-        date: '28 Feb',
-      ),
-      LgtmGroupSession(
-        id: 's3',
-        activity: 'Dinner',
-        winnerName: 'Burger King',
-        winnerIcon: Icons.fastfood,
-        date: '21 Feb',
-      ),
-    ],
-  ),
-  LgtmGroup(
-    id: 'g2',
-    name: 'Hackathon Squad',
-    kind: LgtmGroupKind.work,
-    inviteCode: 'x7ZA1',
-    members: const [
-      _mockCurrentMember,
-      LgtmMember(
-        id: 'u4',
-        displayName: 'Meera',
-        avatarColor: Color(0xFF2F5D5B),
-      ),
-      LgtmMember(
-        id: 'u5',
-        displayName: 'Kabir',
-        avatarColor: Color(0xFF4B3F63),
-      ),
-    ],
-    sessions: const [],
-  ),
-];
+  final LgtmGroupsStore store;
+  final Widget child;
 
-/// Makes the one [LgtmGroupsStore] available to every route.
-class LgtmGroupsScope extends InheritedNotifier<LgtmGroupsStore> {
-  const LgtmGroupsScope({
-    super.key,
-    required LgtmGroupsStore store,
-    required super.child,
-  }) : super(notifier: store);
+  @override
+  Widget build(BuildContext context) =>
+      ChangeNotifierProvider<LgtmGroupsStore>.value(value: store, child: child);
 
   /// Read the store and rebuild when it changes.
   static LgtmGroupsStore of(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<LgtmGroupsScope>()!.notifier!;
+      Provider.of<LgtmGroupsStore>(context);
 
   /// Read the store without subscribing, for one off calls such as a
   /// submission.
   static LgtmGroupsStore read(BuildContext context) =>
-      context.getInheritedWidgetOfExactType<LgtmGroupsScope>()!.notifier!;
+      context.read<LgtmGroupsStore>();
 }

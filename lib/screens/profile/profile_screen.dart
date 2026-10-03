@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/groups_store.dart';
@@ -44,6 +46,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final user = LgtmSessionScope.of(context).user;
     _name.text = user?.displayName ?? '';
+
+    // This screen counts the member's groups, and it can be opened without the
+    // hub ever mounting, so it asks for the read itself. The store only ever
+    // fetches once, however many screens ask.
+    unawaited(LgtmGroupsScope.read(context).load());
   }
 
   @override

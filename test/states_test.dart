@@ -145,7 +145,7 @@ void main() {
     expect(answer, isFalse);
   });
 
-  testWidgets('a destructive confirmation turns the confirm button red', (
+  testWidgets('a destructive confirmation is a flat brand red button', (
     WidgetTester tester,
   ) async {
     await pumpInApp(
@@ -175,6 +175,9 @@ void main() {
           )
           .first,
     );
-    expect((confirm.decoration as BoxDecoration).color, LgtmColors.reject);
+    final decoration = confirm.decoration as BoxDecoration;
+    expect(decoration.color, LgtmColors.primary);
+    // Flat: the offset shadow behind the confirm button is gone.
+    expect(decoration.boxShadow, isEmpty);
   });
 }

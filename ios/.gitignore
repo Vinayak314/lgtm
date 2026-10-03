@@ -32,3 +32,7 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# Downloaded from the Firebase console, per machine. See the Setup section of
+# README.md.
+GoogleService-Info.plist

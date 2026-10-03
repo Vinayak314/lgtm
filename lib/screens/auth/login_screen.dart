@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../app/demo_mode.dart';
 import '../../app/router.dart';
 import '../../app/session.dart';
 import '../../core/design_tokens.dart';
 import '../../core/validators.dart';
 import '../../widgets/design_canvas.dart';
 import '../../widgets/lgtm_buttons.dart';
+import '../../widgets/lgtm_demo_hint.dart';
 import '../../widgets/lgtm_inline_error.dart';
 import '../../widgets/lgtm_logo.dart';
 import '../../widgets/lgtm_text_field.dart';
@@ -14,10 +16,15 @@ import 'auth_social_buttons.dart';
 /// Login. Email and password with readable errors under each field, a password
 /// visibility toggle, and the two social buttons from the design.
 ///
-/// The submission goes through [LgtmSession], which is a mock until the
-/// Firebase items in TODO.md are done.
+/// The submission goes through [LgtmSession]: Firebase in a normal build, the
+/// in-memory mock in a demo build, which is when [showDemoHint] puts the demo
+/// credentials on screen.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.showDemoHint = lgtmDemoMode});
+
+  /// Whether to offer the demo credentials. Defaults to the build's own mode,
+  /// and only overridden by a test, since it is a compile time flag otherwise.
+  final bool showDemoHint;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -118,6 +125,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 40),
+                      if (widget.showDemoHint) ...[
+                        LgtmDemoHint(onUse: _useDemoCredentials),
+                        const SizedBox(height: 24),
+                      ],
                       if (_formError case final message?) ...[
                         LgtmInlineError(message: message),
                         const SizedBox(height: 16),
@@ -184,6 +195,19 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+
+  /// Fills the form from the demo card. Errors are cleared as well, so a red
+  /// line left over from an earlier attempt does not sit under a field that is
+  /// now correct.
+  void _useDemoCredentials(String email, String password) {
+    setState(() {
+      _email.text = email;
+      _password.text = password;
+      _emailError = null;
+      _passwordError = null;
+      _formError = null;
+    });
   }
 
   /// Errors clear as soon as somebody starts fixing them, so a stale red line

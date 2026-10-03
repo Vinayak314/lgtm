@@ -67,6 +67,9 @@ Future<LgtmSession> openProfile(
   );
   await tester.pump();
   await pumpUntil(tester, find.text('Purva'));
+  // The screen asks for the groups itself, so give that read a frame to land
+  // before anything counts them.
+  await pumpUntil(tester, find.text('2 groups'));
   return account;
 }
 

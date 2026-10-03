@@ -1,0 +1,120 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "publicProfiles": {
+      ".read": "auth != null",
+
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['name'])",
+
+        "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" }
+      }
+    },
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['name', 'email'])",
+
+        "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" },
+        "email": { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "fcmToken": { ".validate": "newData.isString() && newData.val().length <= 200" }
+      }
+    },
+
+    // A code points at a group id, and group ids come from push(), so the
+    // value is 21 characters. The cap only exists to bound the write.
+    "inviteCodes": {
+      ".read": "auth != null",
+
+      "$code": {
+        ".write": "auth != null && (((!data.exists() && newData.isString() && root.child('groups').child(newData.val()).child('code').val() === $code && root.child('groups').child(newData.val()).child('ownerId').val() === auth.uid)) || (newData.val() === null && root.child('groups').child(data.val()).exists() === false))",
+        ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
+      }
+    },
+
+    "userGroups": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+
+        "$gid": {
+          // Joining adds the entry once the group already lists the member.
+          // Dropping it is always allowed: it only ever hides a group from the
+          // person dropping it, and joining again puts it back.
+          ".write": "auth != null && auth.uid === $uid && ((newData.val() === true && root.child('groups').child($gid).child('members').child($uid).val() === true) || newData.val() === null)",
+          ".validate": "newData.val() === true || newData.val() === null"
+        }
+      }
+    },
+
+    "groups": {
+      "$gid": {
+        ".read": "auth != null && data.child('members').child(auth.uid).val() === true",
+
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerId').val() === auth.uid && newData.child('members').child(auth.uid).val() === true) || (data.exists() && newData.val() === null && data.child('ownerId').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['name', 'code', 'ownerId', 'members'])",
+
+        "name": { ".write": "auth != null && newData.parent().child('ownerId').val() === auth.uid", ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40" },
+        "code": { ".write": "auth != null && newData.parent().child('ownerId').val() === auth.uid", ".validate": "newData.isString() && newData.val().length >= 4 && newData.val().length <= 12" },
+        "kind": { ".write": "auth != null && newData.parent().child('ownerId').val() === auth.uid", ".validate": "newData.val() === 'home' || newData.val() === 'work'" },
+        "createdAt": { ".write": "auth != null && newData.parent().child('ownerId').val() === auth.uid", ".validate": "newData.isNumber()" },
+        "activeSession": { ".write": "auth != null && newData.parent().child('ownerId').val() === auth.uid", ".validate": "newData.val() === null || newData.isString()" },
+
+        "ownerId": {
+          ".write": "auth != null && data.parent().child('ownerId').val() === auth.uid",
+          ".validate": "newData.isString() && newData.val() === auth.uid"
+        },
+
+        "members": {
+          "$uid": {
+            ".write": "auth != null && ((newData.val() === true && (auth.uid === $uid || newData.parent().parent().child('ownerId').val() === auth.uid)) || (newData.val() === null && (auth.uid === $uid || data.parent().parent().child('ownerId').val() === auth.uid)))",
+            ".validate": "newData.val() === true || newData.val() === null"
+          }
+        }
+      }
+    },
+
+    "sessions": {
+      "$sid": {
+        ".read": "auth != null && root.child('groups').child(data.child('groupId').val()).child('members').child(auth.uid).val() === true",
+
+        ".write": "auth != null && !data.exists() && newData.child('hostId').val() === auth.uid && root.child('groups').child(newData.child('groupId').val()).child('members').child(auth.uid).val() === true",
+        ".validate": "newData.hasChildren(['groupId', 'hostId'])",
+
+        "groupId": { ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())" },
+        "hostId": { ".validate": "newData.isString() && newData.val().length > 0" },
+        "status": { ".write": "auth != null && newData.parent().child('hostId').val() === auth.uid", ".validate": "newData.val() === 'lobby' || newData.val() === 'active' || newData.val() === 'finished'" },
+        "category": { ".write": "auth != null && newData.parent().child('hostId').val() === auth.uid", ".validate": "newData.isString() || newData.val() === null" },
+        "radius": { ".write": "auth != null && newData.parent().child('hostId').val() === auth.uid", ".validate": "newData.isNumber()" },
+        "createdAt": { ".write": "auth != null && newData.parent().child('hostId').val() === auth.uid", ".validate": "newData.isNumber()" },
+
+        "cards": { ".write": "auth != null && newData.parent().child('hostId').val() === auth.uid" },
+
+        "winner": {
+          ".write": "auth != null && !data.exists() && newData.parent().child('hostId').val() === auth.uid",
+          ".validate": "newData.val() === null || newData.isString() || newData.hasChildren(['cardId'])"
+        },
+
+        "participants": {
+          "$uid": {
+            ".write": "auth != null && newData.val() === true && (newData.parent().parent().child('hostId').val() === auth.uid || (auth.uid === $uid && root.child('groups').child(newData.parent().parent().child('groupId').val()).child('members').child(auth.uid).val() === true))",
+            ".validate": "newData.val() === true"
+          }
+        },
+
+        "votes": {
+          "$cardId": {
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($sid).child('participants').child($uid).val() === true",
+              ".validate": "newData.isBoolean()"
+            }
+          }
+        }
+      }
+    }
+  }
+}
