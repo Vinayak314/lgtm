@@ -7,6 +7,7 @@ import '../screens/groups/create_group_screen.dart';
 import '../screens/groups/group_detail_screen.dart';
 import '../screens/groups/groups_hub_screen.dart';
 import '../screens/groups/join_group_screen.dart';
+import '../screens/profile/profile_screen.dart';
 import '../screens/splash/auth_gate_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/system/not_found_screen.dart';
@@ -111,6 +112,9 @@ Route<Object?> lgtmGenerateRoute(RouteSettings settings) {
         return _page(settings, NotFoundScreen(path: settings.name));
       }
       return _page(settings, GroupDetailScreen(args: args));
+
+    case LgtmRoutes.profile:
+      return _page(settings, const ProfileScreen());
 
     case LgtmRoutes.designPreview:
       return _page(settings, const FoundationPreviewScreen());

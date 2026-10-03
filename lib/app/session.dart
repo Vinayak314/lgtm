@@ -99,6 +99,19 @@ class LgtmSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Renames the signed in person from the Profile screen. Ignored when
+  /// nobody is signed in, so it can never resurrect a session.
+  Future<bool> updateDisplayName(String displayName) async {
+    final user = _user;
+    if (user == null) return false;
+
+    await Future<void>.delayed(authDelay);
+
+    _user = LgtmUser(displayName: displayName.trim(), email: user.email);
+    notifyListeners();
+    return true;
+  }
+
   /// Clears a failure message once the form has been edited.
   void clearError() {
     if (_error == null) return;

@@ -5,19 +5,19 @@ Work is split into two balanced, end-to-end tracks. Each team member owns fronte
 ## Team Member 1: Purva (App foundation, identity, and groups)
 
 ### Frontend
-- [ ] Replace the Flutter counter template with the LGTM app shell.
-- [ ] Add the Material 3 theme, typography, colors, and shared UI components.
-- [ ] Add named routes, route argument handling, and an unknown-route screen.
-- [ ] Add shared loading, error, empty, offline, and confirmation states.
-- [ ] Build Splash and auth-state loading screens.
-- [ ] Build Login and Sign Up forms with validation, password visibility, and readable errors.
+- [x] Replace the Flutter counter template with the LGTM app shell.
+- [x] Add the Material 3 theme, typography, colors, and shared UI components.
+- [x] Add named routes, route argument handling, and an unknown-route screen.
+- [x] Add shared loading, error, empty, offline, and confirmation states.
+- [x] Build Splash and auth-state loading screens.
+- [x] Build Login and Sign Up forms with validation, password visibility, and readable errors.
 - [x] Build the My Groups hub with group cards, Create, and Join by code actions.
 - [x] Build Create Group and Join Group forms.
 - [x] Build Group Detail with member list, invite code/share action, session history entry point, and Start Session action.
-- [ ] Add Profile / Settings UI with display name and logout action.
-- [ ] Connect foundation, auth, and group screens to app state and loading/error states using mock data first.
-- [ ] Check responsive layouts, accessibility labels, and keyboard behavior for these screens.
-- [ ] Add app icon and launcher branding.
+- [x] Add Profile / Settings UI with display name and logout action.
+- [x] Connect foundation, auth, and group screens to app state and loading/error states using mock data first.
+- [x] Check responsive layouts, accessibility labels, and keyboard behavior for these screens.
+- [x] Add app icon and launcher branding.
 
 ### Backend
 - [ ] Add null-safe user and group models with JSON conversion.

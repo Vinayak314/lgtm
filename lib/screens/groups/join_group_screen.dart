@@ -116,6 +116,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
                       errorText: _codeError,
                       enabled: !_submitting,
                       textCapitalization: TextCapitalization.characters,
+                      autocorrect: false,
                       textInputAction: TextInputAction.done,
                       onChanged: (_) => _onChanged(),
                       onSubmitted: (_) => _submit(),

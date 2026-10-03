@@ -42,8 +42,8 @@ class LgtmPill extends StatelessWidget {
   }
 }
 
-/// Rounded tile that holds a single green glyph. Used in the Past Winners rows
-/// (36pt mint square, radius 12pt), as a circle on group list rows and
+/// Circular tile that holds a single green glyph. Used in the Past Winners rows
+/// (36pt mint circle), and as the group kind circle on group list rows and
 /// anywhere else a glyph needs its own surface.
 ///
 /// The glyph is always centred and always leaves at least 8pt of tile on every
@@ -56,7 +56,7 @@ class LgtmIconTile extends StatelessWidget {
     this.iconSize = 20,
     this.fill = LgtmColors.mint,
     this.color = LgtmColors.green,
-    this.borderRadius = LgtmRadius.tile,
+    this.borderRadius = LgtmRadius.pill,
   }) : assert(
          iconSize <= size - 16,
          'iconSize must leave at least 8pt of tile on every side',

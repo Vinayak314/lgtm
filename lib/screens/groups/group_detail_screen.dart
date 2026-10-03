@@ -60,11 +60,14 @@ class GroupDetailScreen extends StatelessWidget {
               color: LgtmColors.primary,
               onPressed: () => Navigator.of(context).maybePop(),
             ),
-            center: Text(
-              group.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: LgtmSerif.title.copyWith(color: LgtmColors.ink),
+            center: Semantics(
+              header: true,
+              child: Text(
+                group.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: LgtmSerif.title.copyWith(color: LgtmColors.ink),
+              ),
             ),
           ),
           Expanded(child: _body(context, store, group)),
@@ -97,7 +100,7 @@ class GroupDetailScreen extends StatelessWidget {
           onShare: () => _say(context, 'Sharing is not connected yet.'),
         ),
         const SizedBox(height: 24),
-        Text('MEMBERS', style: labelStyle),
+        Semantics(header: true, child: Text('MEMBERS', style: labelStyle)),
         const SizedBox(height: 12),
         LgtmCard(
           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -118,7 +121,10 @@ class GroupDetailScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        Text('PAST SESSIONS', style: labelStyle),
+        Semantics(
+          header: true,
+          child: Text('PAST SESSIONS', style: labelStyle),
+        ),
         const SizedBox(height: 12),
         if (!group.hasWinners)
           LgtmCard(

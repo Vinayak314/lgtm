@@ -4,7 +4,13 @@ import '../core/design_tokens.dart';
 
 /// Shared top app bar pattern: 64pt of content sitting below a top inset of
 /// `max(safe-area-inset-top, 20pt)`, cream background, 1pt bottom rule at the
-/// very bottom of the header, 24pt side padding, 24pt glyphs.
+/// very bottom of the header, 1pt bottom border, 12pt side padding, 24pt
+/// glyphs.
+///
+/// The bar is a three column grid: 48pt leading, the title, 48pt trailing.
+/// Both side cells are the same width whether or not they hold anything, so
+/// the title is centred on the whole screen rather than on the space the
+/// leading button leaves behind.
 ///
 /// Place it as the first child of the screen body. It reserves its own status
 /// bar space, so it must not also be handed to `Scaffold.appBar`, which adds
@@ -22,6 +28,10 @@ class LgtmTopBar extends StatelessWidget {
 
   final Widget? leading;
   final Widget? center;
+
+  /// Trailing controls. The trailing cell is one 48pt wide so the title stays
+  /// centred, which means a screen passes at most one (a "..." menu, an
+  /// avatar). Anything wider would push the title off centre.
   final List<Widget> actions;
   final bool centerTitle;
   final bool showDivider;
@@ -40,13 +50,13 @@ class LgtmTopBar extends StatelessWidget {
       child: SizedBox(
         height: LgtmLayout.topBarHeight,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: LgtmLayout.gutter),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              if (leading case final l?)
-                SizedBox(width: 44, child: Center(child: l))
-              else
-                const SizedBox(width: 4),
+              SizedBox(
+                width: _sideWidth,
+                child: Center(child: leading ?? const SizedBox.shrink()),
+              ),
               Expanded(
                 child: center == null
                     ? const SizedBox.shrink()
@@ -57,16 +67,26 @@ class LgtmTopBar extends StatelessWidget {
                         child: center,
                       ),
               ),
-              ...actions.map(
-                (a) => SizedBox(width: 40, child: Center(child: a)),
+              SizedBox(
+                width: _sideWidth,
+                child: Center(
+                  child: switch (actions) {
+                    [] => const SizedBox.shrink(),
+                    [final single] => single,
+                    _ => Row(mainAxisSize: MainAxisSize.min, children: actions),
+                  },
+                ),
               ),
-              if (actions.isEmpty) const SizedBox(width: 4),
             ],
           ),
         ),
       ),
     );
   }
+
+  /// Width of the leading and trailing cells. Equal on both sides, which is
+  /// what puts the title on the true centre line.
+  static const _sideWidth = 48.0;
 }
 
 /// Square icon button sized for the 64pt top bar.

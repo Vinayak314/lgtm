@@ -26,6 +26,7 @@ class LgtmTextField extends StatefulWidget {
     this.onSubmitted,
     this.onChanged,
     this.maxLines = 1,
+    this.autocorrect = true,
   });
 
   final String label;
@@ -48,6 +49,10 @@ class LgtmTextField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final int maxLines;
 
+  /// Turned off for codes, which are case sensitive and get mangled by a
+  /// spell checker.
+  final bool autocorrect;
+
   @override
   State<LgtmTextField> createState() => _LgtmTextFieldState();
 }
@@ -60,40 +65,49 @@ class _LgtmTextFieldState extends State<LgtmTextField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          widget.label.toUpperCase(),
-          style: LgtmSans.label.copyWith(color: LgtmColors.inkMuted),
+        // The visible label is decoration: the field itself carries it as its
+        // semantics label, so a screen reader says "Email address" rather than
+        // the placeholder text.
+        ExcludeSemantics(
+          child: Text(
+            widget.label.toUpperCase(),
+            style: LgtmSans.label.copyWith(color: LgtmColors.inkMuted),
+          ),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: widget.controller,
-          focusNode: widget.focusNode,
-          enabled: widget.enabled,
-          obscureText: widget.obscure && _hidden,
-          keyboardType: widget.keyboardType,
-          textInputAction: widget.textInputAction,
-          textCapitalization: widget.textCapitalization,
-          autofillHints: widget.autofillHints,
-          onSubmitted: widget.onSubmitted,
-          onChanged: widget.onChanged,
-          maxLines: widget.maxLines,
-          style: LgtmSans.body.copyWith(color: LgtmColors.ink),
-          cursorColor: LgtmColors.primary,
-          decoration: InputDecoration(
-            hintText: widget.hint,
-            filled: true,
-            fillColor: LgtmColors.card,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 14,
+        Semantics(
+          label: widget.label,
+          child: TextField(
+            controller: widget.controller,
+            focusNode: widget.focusNode,
+            enabled: widget.enabled,
+            obscureText: widget.obscure && _hidden,
+            keyboardType: widget.keyboardType,
+            textInputAction: widget.textInputAction,
+            textCapitalization: widget.textCapitalization,
+            autofillHints: widget.autofillHints,
+            onSubmitted: widget.onSubmitted,
+            onChanged: widget.onChanged,
+            maxLines: widget.maxLines,
+            autocorrect: widget.autocorrect,
+            style: LgtmSans.body.copyWith(color: LgtmColors.ink),
+            cursorColor: LgtmColors.primary,
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              filled: true,
+              fillColor: LgtmColors.card,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 14,
+              ),
+              suffixIcon: widget.obscure
+                  ? _VisibilityToggle(
+                      hidden: _hidden,
+                      onToggle: () => setState(() => _hidden = !_hidden),
+                    )
+                  : null,
+              error: _error,
             ),
-            suffixIcon: widget.obscure
-                ? _VisibilityToggle(
-                    hidden: _hidden,
-                    onToggle: () => setState(() => _hidden = !_hidden),
-                  )
-                : null,
-            error: _error,
           ),
         ),
       ],

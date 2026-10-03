@@ -1,11 +1,11 @@
 {
-    "name": "lgtm",
-    "short_name": "lgtm",
+    "name": "LGTM",
+    "short_name": "LGTM",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FDF9F4",
+    "theme_color": "#A33A40",
+    "description": "LGTM: swipe through options together and let the group decide.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -126,7 +126,7 @@ Plain cream screen, no header, no bottom nav.
   - Avatar stack below: 4 circles, 38px each, overlapping by about 6px, each with a 2px `--card` ring. Photos are dark moody portraits (`/assets/avatar-1..4.png`, fallback dark grey/teal/purple circles).
   - 1px divider `#DDD6CF` full width inside padding, 24px above and below.
   - Label "PAST WINNERS": same style as ACTIVE MEMBERS.
-  - Three rows, each 308px wide, 48px tall, radius 24px (pill), fill `--surface-2`, 1px border `#E8CFCB`, vertical gap about 30px between row tops (78px pitch). Each row: left 36px rounded-square tile (radius 12px, fill `--mint`) holding a 20px `--green` icon, 12px gap, name in Plus Jakarta Sans 500, 16px, `--ink`.
+  - Three rows, each 308px wide, 48px tall, radius 24px (pill), fill `--surface-2`, 1px border `#E8CFCB`, vertical gap about 30px between row tops (78px pitch). Each row: left 36px circle (fill `--mint`) holding a 20px `--green` icon, 12px gap, name in Plus Jakarta Sans 500, 16px, `--ink`.
     - Row 1: "Taco Bell" (taco/fork icon). Row 2: "Sushi Zen" (sushi icon). Row 3: "Burger King" (burger icon).
 - **Group card 2, "Hackathon Squad"**: x=22, width 356, height 96px, 24px below card 1, radius 48px, 1px `--rose-border`, fill white `#FFFFFF`. Left: 48px circle fill `#E8E4DE` with a terminal icon (rectangle with ">_") in `--green`. Title "Hackathon Squad" Vollkorn 700 22px `--ink`. Right: chevron ">" 20px `--ink`. 16px horizontal padding.
 - **CTA** "Start New Session (Dinner)": x=22, width 356, height 60px, 36px below card 2, radius 30px, fill `--primary`, soft shadow `0 6px 14px rgba(163,58,64,0.3)`. Content centred: white filled circle-with-plus icon 20px, 8px gap, label Vollkorn 600 (serif), 17px, white.

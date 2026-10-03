@@ -106,19 +106,19 @@ class _FoundationPreviewScreenState extends State<FoundationPreviewScreen> {
                 ),
                 const SizedBox(height: 24),
                 const LgtmCard(
-                  height: 96,
+                  height: 72,
                   radius: LgtmRadius.pill,
-                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  padding: EdgeInsets.only(left: 16, right: 20),
                   child: Row(
                     children: [
                       LgtmIconTile(
                         icon: Icons.dns_outlined,
-                        size: 48,
-                        iconSize: 22,
+                        size: 40,
+                        iconSize: 20,
                         fill: LgtmColors.tileCircle,
                         borderRadius: LgtmRadius.pill,
                       ),
-                      SizedBox(width: 16),
+                      SizedBox(width: 14),
                       Expanded(
                         child: Text(
                           'Hackathon Squad',
@@ -126,12 +126,16 @@ class _FoundationPreviewScreenState extends State<FoundationPreviewScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontFamily: LgtmSerif.family,
-                            fontSize: 22,
+                            fontSize: 20,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      Icon(Icons.chevron_right, color: LgtmColors.ink),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: LgtmColors.ink,
+                      ),
                     ],
                   ),
                 ),

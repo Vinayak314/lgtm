@@ -79,6 +79,9 @@ class LgtmCardHeader extends StatelessWidget {
         Expanded(
           child: Text(
             title,
+            // A long group name ellipsises rather than pushing the card taller.
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: LgtmSerif.title.copyWith(color: LgtmColors.ink),
           ),
         ),

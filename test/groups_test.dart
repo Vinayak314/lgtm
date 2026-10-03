@@ -10,6 +10,8 @@ import 'package:lgtm/screens/groups/create_group_screen.dart';
 import 'package:lgtm/screens/groups/group_detail_screen.dart';
 import 'package:lgtm/screens/groups/groups_hub_screen.dart';
 import 'package:lgtm/screens/groups/join_group_screen.dart';
+import 'package:lgtm/widgets/lgtm_card.dart';
+import 'package:lgtm/widgets/lgtm_pill.dart';
 
 /// The app is a 390pt column, so the tests are too.
 void usePhoneWindow(WidgetTester tester) {
@@ -73,6 +75,17 @@ const _roommates = LgtmGroup(
       date: '12 Mar',
     ),
   ],
+);
+
+const _squad = LgtmGroup(
+  id: 'g2',
+  name: 'Squad',
+  kind: LgtmGroupKind.work,
+  inviteCode: 'x7ZA1',
+  members: [
+    LgtmMember(id: 'u0', displayName: 'Purva', avatarColor: Color(0xFF4A4A4A)),
+  ],
+  sessions: [],
 );
 
 const _outsider = LgtmMember(
@@ -177,6 +190,9 @@ void main() {
         300,
       );
       expect(find.text('Start New Session (Dinner)'), findsOneWidget);
+
+      // The Create and Join row sits below the CTA, so it needs its own scroll.
+      await tester.scrollUntilVisible(find.text('Join by Code'), 200);
       expect(find.text('Create Group'), findsOneWidget);
       expect(find.text('Join by Code'), findsOneWidget);
     });
@@ -203,6 +219,45 @@ void main() {
       expect(find.byType(GroupDetailScreen), findsOneWidget);
       expect(find.text('lgtm.app/invite/vYzA1'), findsOneWidget);
       expect(find.text('Create Group'), findsNothing);
+    });
+
+    testWidgets('every collapsed group card uses the 72pt pill metrics', (
+      WidgetTester tester,
+    ) async {
+      await openHub(tester, store: fastStore(seed: [_roommates, _squad]));
+
+      final cards = find.byType(LgtmCard);
+      // The first group gets the tall card, the second the collapsed one.
+      expect(cards, findsNWidgets(2));
+
+      final collapsed = cards.last;
+      expect(tester.getSize(collapsed).height, 72);
+
+      final icon = find.descendant(
+        of: collapsed,
+        matching: find.byType(LgtmIconTile),
+      );
+      expect(tester.getSize(icon), const Size.square(40));
+
+      // The 1pt card border sits outside the padding, so 16pt of padding is
+      // 17pt from the drawn edge.
+      final circle = tester.getRect(icon);
+      final card = tester.getRect(collapsed);
+      expect(circle.left - card.left, 17);
+      expect(card.top - circle.top, closeTo(circle.bottom - card.bottom, 0.5));
+
+      final name = find.descendant(of: collapsed, matching: find.text('Squad'));
+      expect(
+        tester.getSize(name).height,
+        lessThan(tester.getSize(collapsed).height),
+      );
+
+      final chevron = find.descendant(
+        of: collapsed,
+        matching: find.byIcon(Icons.chevron_right),
+      );
+      expect(tester.getSize(chevron), const Size.square(18));
+      expect(card.right - tester.getRect(chevron).right, closeTo(21, 0.5));
     });
 
     testWidgets('the join action opens the join form', (

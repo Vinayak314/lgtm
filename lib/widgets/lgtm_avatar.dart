@@ -14,6 +14,7 @@ class LgtmAvatar extends StatelessWidget {
     this.ringColor,
     this.ringWidth = 0,
     this.label,
+    this.onTap,
   });
 
   final String? imagePath;
@@ -23,6 +24,10 @@ class LgtmAvatar extends StatelessWidget {
   final Color? ringColor;
   final double ringWidth;
   final String? label;
+
+  /// Makes the avatar a button, which is how the hub and detail screens reach
+  /// the profile. The hit area stays circular and exactly the avatar size.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -56,8 +61,24 @@ class LgtmAvatar extends StatelessWidget {
       );
     }
 
-    if (label == null) return avatar;
-    return Semantics(label: label, image: true, child: avatar);
+    if (label == null) {
+      avatar = Semantics(image: true, child: avatar);
+    } else {
+      avatar = Semantics(label: label, image: true, child: avatar);
+    }
+
+    if (onTap case final tap?) {
+      avatar = Semantics(
+        button: true,
+        child: InkWell(
+          onTap: tap,
+          customBorder: const CircleBorder(),
+          child: avatar,
+        ),
+      );
+    }
+
+    return avatar;
   }
 
   Widget _fallback() => ColoredBox(

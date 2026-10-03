@@ -46,8 +46,8 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
     arguments: GroupDetailArgs(groupId: group.id),
   );
 
-  /// Only Groups is built. The other three tabs belong to the session and
-  /// profile items in TODO.md, so they say so instead of going nowhere.
+  /// Groups and Profile are built. Swipe and Matches belong to the session
+  /// items in TODO.md, so they say so instead of going nowhere.
   void _onTab(LgtmNavTab tab) {
     switch (tab) {
       case LgtmNavTab.groups:
@@ -57,7 +57,7 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
       case LgtmNavTab.matches:
         _say('Matches are not built yet.');
       case LgtmNavTab.profile:
-        _say('Profile is not built yet.');
+        Navigator.of(context).pushNamed(LgtmRoutes.profile);
     }
   }
 
@@ -79,8 +79,14 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
               onPressed: () => _say('The menu is not built yet.'),
             ),
             center: const LgtmLogo(size: 30, color: LgtmColors.primary),
-            actions: const [
-              LgtmAvatar(size: 40, fallbackColor: Color(0xFF4A4A4A)),
+            actions: [
+              LgtmAvatar(
+                size: 40,
+                fallbackColor: const Color(0xFF4A4A4A),
+                label: 'Your profile',
+                onTap: () =>
+                    Navigator.of(context).pushNamed(LgtmRoutes.profile),
+              ),
             ],
           ),
           Expanded(child: _body(store)),
@@ -114,9 +120,12 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 32, 22, 24),
       children: [
-        Text(
-          'My Groups',
-          style: LgtmSerif.display.copyWith(color: LgtmColors.ink),
+        Semantics(
+          header: true,
+          child: Text(
+            'My Groups',
+            style: LgtmSerif.display.copyWith(color: LgtmColors.ink),
+          ),
         ),
         const SizedBox(height: 24),
         _FullGroupCard(group: first, onTap: () => _openGroup(first)),
@@ -218,7 +227,7 @@ class _FullGroupCard extends StatelessWidget {
   }
 }
 
-/// The 96pt pill row used for every group after the first.
+/// The 72pt pill row used for every group after the first.
 class _CompactGroupCard extends StatelessWidget {
   const _CompactGroupCard({required this.group, required this.onTap});
 
@@ -228,30 +237,33 @@ class _CompactGroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LgtmCard(
-      height: 96,
+      height: 72,
       radius: LgtmRadius.pill,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.only(left: 16, right: 20),
       fill: LgtmColors.cardPure,
       onTap: onTap,
       child: Row(
         children: [
           LgtmIconTile(
             icon: groupIcon(group.kind),
-            size: 48,
-            iconSize: 22,
+            size: 40,
+            iconSize: 20,
             fill: LgtmColors.tileCircle,
             borderRadius: LgtmRadius.pill,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
               group.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: LgtmSerif.title.copyWith(color: LgtmColors.ink),
+              style: LgtmSerif.title.copyWith(
+                fontSize: 20,
+                color: LgtmColors.ink,
+              ),
             ),
           ),
-          const Icon(Icons.chevron_right, color: LgtmColors.ink),
+          const Icon(Icons.chevron_right, size: 18, color: LgtmColors.ink),
         ],
       ),
     );

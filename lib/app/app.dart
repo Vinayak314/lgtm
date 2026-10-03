@@ -13,6 +13,7 @@ class LgtmApp extends StatefulWidget {
     super.key,
     this.initialRoute = LgtmRoutes.splash,
     this.groupsStore,
+    this.session,
   });
 
   /// Overridden by tests to open straight onto a screen.
@@ -20,6 +21,9 @@ class LgtmApp extends StatefulWidget {
 
   /// Overridden by tests that need a known set of groups.
   final LgtmGroupsStore? groupsStore;
+
+  /// Overridden by tests that need to start already signed in, or signed out.
+  final LgtmSession? session;
 
   @override
   State<LgtmApp> createState() => _LgtmAppState();
@@ -29,7 +33,7 @@ class _LgtmAppState extends State<LgtmApp> {
   /// One session for the life of the app. The real one is built here when the
   /// Firebase work in TODO.md lands; every screen reads it through
   /// [LgtmSessionScope].
-  final LgtmSession _session = LgtmSession();
+  late final LgtmSession _session = widget.session ?? LgtmSession();
 
   /// Same story for the groups: one mock store for the whole app, shared with
   /// every route through [LgtmGroupsScope].

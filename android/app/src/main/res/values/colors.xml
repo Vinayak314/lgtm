@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- LgtmColors.primary: the adaptive icon background. -->
+    <color name="ic_launcher_background">#A33A40</color>
+    <!-- LgtmColors.bg: the cream the app draws on, so the launcher window
+         hands over to Flutter without a white flash. -->
+    <color name="launch_background">#FDF9F4</color>
+</resources>

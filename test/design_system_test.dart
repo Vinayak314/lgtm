@@ -123,7 +123,7 @@ void main() {
     const tile = LgtmIconTile(icon: Icons.lunch_dining);
 
     expect(tile.size, 36);
-    expect(tile.borderRadius, LgtmRadius.tile);
+    expect(tile.borderRadius, LgtmRadius.pill);
     expect(tile.iconSize, 20);
     expect(tile.size - tile.iconSize, greaterThanOrEqualTo(16));
   });
@@ -132,6 +132,65 @@ void main() {
     expect(
       () => LgtmIconTile(icon: Icons.lunch_dining, size: 36, iconSize: 22),
       throwsAssertionError,
+    );
+  });
+
+  testWidgets('the bar title sits on the true centre line', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    Future<double> titleCentreWith({Widget? leading, Widget? trailing}) async {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(),
+          child: MaterialApp(
+            home: Scaffold(
+              body: LgtmTopBar(
+                leading:
+                    leading ??
+                    const LgtmIconButton(
+                      icon: Icons.arrow_back,
+                      tooltip: 'Back',
+                      onPressed: _noop,
+                    ),
+                center: const Text('Roommates'),
+                actions: [?trailing],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      return tester.getCenter(find.text('Roommates')).dx;
+    }
+
+    const width = 390.0;
+
+    // A back arrow with nothing on the right used to push the title right.
+    expect(await titleCentreWith(), closeTo(width / 2, 0.5));
+
+    // Same with a trailing action: both cells are the same width.
+    expect(
+      await titleCentreWith(trailing: const Icon(Icons.more_horiz)),
+      closeTo(width / 2, 0.5),
+    );
+
+    // And with no leading control at all.
+    await tester.pumpWidget(
+      const MediaQuery(
+        data: MediaQueryData(),
+        child: MaterialApp(
+          home: Scaffold(body: LgtmTopBar(center: Text('Roommates'))),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(
+      tester.getCenter(find.text('Roommates')).dx,
+      closeTo(width / 2, 0.5),
     );
   });
 
@@ -161,3 +220,5 @@ void main() {
     );
   });
 }
+
+void _noop() {}
