@@ -14,6 +14,8 @@ import '../../widgets/lgtm_winner_row.dart';
 import '../../widgets/states/lgtm_empty_state.dart';
 import '../../widgets/states/lgtm_error_state.dart';
 import '../../widgets/states/lgtm_loading_state.dart';
+import '../session/session_history_screen.dart';
+import '../session/session_setup_screen.dart';
 
 /// My Groups, the signed in landing page.
 ///
@@ -47,18 +49,39 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
     arguments: GroupDetailArgs(groupId: group.id),
   );
 
-  /// Groups and Profile are built. Swipe and Matches belong to the session
-  /// items in TODO.md, so they say so instead of going nowhere.
   void _onTab(LgtmNavTab tab) {
     switch (tab) {
       case LgtmNavTab.groups:
         return;
       case LgtmNavTab.swipe:
-        _say('The swipe flow is not built yet.');
+        final groups = LgtmGroupsScope.read(context).groups;
+        if (groups.isEmpty) {
+          _say('Create or join a group before starting a session.');
+          return;
+        }
+        Navigator.of(context).pushNamed(
+          LgtmRoutes.sessionSetup,
+          arguments: SessionSetupArgs(groupId: groups.first.id),
+        );
+        return;
       case LgtmNavTab.matches:
-        _say('Matches are not built yet.');
+        final groups = LgtmGroupsScope.read(context).groups;
+        if (groups.isEmpty) {
+          _say('Create or join a group to see its session history.');
+          return;
+        }
+        Navigator.of(context).pushNamed(
+          LgtmRoutes.sessionHistory,
+          arguments: SessionHistoryArgs(
+            groupId: groups.first.id,
+            groupName: groups.first.name,
+            pastSessions: groups.first.sessions,
+          ),
+        );
+        return;
       case LgtmNavTab.profile:
         Navigator.of(context).pushNamed(LgtmRoutes.profile);
+        return;
     }
   }
 
@@ -140,7 +163,6 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
             style: LgtmSerif.display.copyWith(color: LgtmColors.ink),
           ),
         ),
-        const SizedBox(height: 24),
         _FullGroupCard(group: first, onTap: () => _openGroup(first)),
         for (final group in groups.skip(1)) ...[
           const SizedBox(height: 24),
@@ -152,7 +174,12 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
           icon: Icons.add_circle_outline,
           height: 60,
           shadows: LgtmShadow.primarySoft,
-          onPressed: () => _say('Session setup is not built yet.'),
+          onPressed: () {
+            Navigator.of(context).pushNamed(
+              LgtmRoutes.sessionSetup,
+              arguments: SessionSetupArgs(groupId: first.id),
+            );
+          },
         ),
         const SizedBox(height: 16),
         Row(

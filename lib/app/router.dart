@@ -7,6 +7,13 @@ import '../screens/groups/group_detail_screen.dart';
 import '../screens/groups/groups_hub_screen.dart';
 import '../screens/groups/join_group_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/session/lobby_screen.dart';
+import '../screens/session/no_consensus_screen.dart';
+import '../screens/session/result_screen.dart';
+import '../screens/session/session_history_screen.dart';
+import '../screens/session/session_setup_screen.dart';
+import '../screens/session/swipe_screen.dart';
+import '../screens/session/waiting_screen.dart';
 import '../screens/splash/auth_gate_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/system/not_found_screen.dart';
@@ -36,6 +43,15 @@ abstract final class LgtmRoutes {
   static const groupDetail = '/groups/detail';
 
   static const profile = '/profile';
+
+  /// Session flow routes
+  static const sessionSetup = '/session/setup';
+  static const sessionLobby = '/session/lobby';
+  static const sessionSwipe = '/session/swipe';
+  static const sessionWaiting = '/session/waiting';
+  static const sessionResult = '/session/result';
+  static const sessionNoConsensus = '/session/no-consensus';
+  static const sessionHistory = '/session/history';
 }
 
 /// Arguments for [LgtmRoutes.signUp].
@@ -109,6 +125,62 @@ Route<Object?> lgtmGenerateRoute(RouteSettings settings) {
 
     case LgtmRoutes.profile:
       return _page(settings, const ProfileScreen());
+
+    case LgtmRoutes.sessionSetup:
+      final args = SessionSetupArgs.fromRoute(settings);
+      if (args == null) {
+        return _page(settings, NotFoundScreen(path: settings.name));
+      }
+      return _page(
+        settings,
+        SessionSetupScreen(args: args),
+      );
+
+    case LgtmRoutes.sessionLobby:
+      final args = LobbyArgs.fromRoute(settings);
+      if (args == null) {
+        return _page(settings, NotFoundScreen(path: settings.name));
+      }
+      return _page(
+        settings,
+        LobbyScreen(args: args),
+      );
+
+    case LgtmRoutes.sessionSwipe:
+      final args = SwipeArgs.fromRoute(settings);
+      if (args == null || args.groupId.isEmpty) {
+        return _page(settings, NotFoundScreen(path: settings.name));
+      }
+      return _page(
+        settings,
+        SwipeScreen(args: args),
+      );
+
+    case LgtmRoutes.sessionWaiting:
+      return _page(settings, const WaitingScreen());
+
+    case LgtmRoutes.sessionResult:
+      final args = ResultArgs.fromRoute(settings);
+      if (args == null) {
+        return _page(settings, NotFoundScreen(path: settings.name));
+      }
+      return _page(
+        settings,
+        ResultScreen(args: args),
+      );
+
+    case LgtmRoutes.sessionNoConsensus:
+      return _page(settings, const NoConsensusScreen());
+
+    case LgtmRoutes.sessionHistory:
+      final args = SessionHistoryArgs.fromRoute(settings);
+      if (args == null) {
+        return _page(settings, NotFoundScreen(path: settings.name));
+      }
+      return _page(
+        settings,
+        SessionHistoryScreen(args: args),
+      );
 
     default:
       return _page(settings, NotFoundScreen(path: settings.name));

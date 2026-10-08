@@ -10,6 +10,7 @@ import '../../widgets/lgtm_card.dart';
 import '../../widgets/lgtm_pill.dart';
 import '../../widgets/lgtm_top_bar.dart';
 import '../../widgets/states/lgtm_empty_state.dart';
+import '../session/session_setup_screen.dart';
 
 /// Group Detail: the invite link to share, who is in the group, what they
 /// already decided, and the way into a new session.
@@ -27,12 +28,12 @@ class GroupDetailScreen extends StatelessWidget {
         backgroundColor: LgtmColors.bg,
         body: Column(
           children: [
-            const LgtmTopBar(
+            LgtmTopBar(
               leading: LgtmIconButton(
                 icon: Icons.arrow_back,
                 tooltip: 'Back to My Groups',
                 color: LgtmColors.primary,
-                onPressed: _noop,
+                onPressed: () => Navigator.of(context).maybePop(),
               ),
             ),
             Expanded(
@@ -74,7 +75,10 @@ class GroupDetailScreen extends StatelessWidget {
         ],
       ),
       bottomNavigationBar: _StartSessionBar(
-        onPressed: () => _say(context, 'Session setup is not built yet.'),
+        onPressed: () => Navigator.of(context).pushNamed(
+          LgtmRoutes.sessionSetup,
+          arguments: SessionSetupArgs(groupId: group.id),
+        ),
       ),
     );
   }
@@ -370,5 +374,3 @@ class _StartSessionBar extends StatelessWidget {
 void _say(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }
-
-void _noop() {}

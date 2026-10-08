@@ -62,6 +62,7 @@ firebase-debug.*.log
 # Local handoff notes. Written for one person on one chat, never for the
 # repo.
 TEAMMATE_HANDOFF.md
+FIREBASE_SETUP.md
 
 # Symbolication related
 app.*.symbols
