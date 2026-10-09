@@ -43,7 +43,7 @@ class CardSwipedEvent extends SessionEvent {
   final bool liked;
 }
 
-/// Session stream emitted an update from Firebase or In-Memory repository.
+/// Session stream emitted an update.
 class SessionUpdatedEvent extends SessionEvent {
   const SessionUpdatedEvent(this.session);
   final LgtmSession? session;

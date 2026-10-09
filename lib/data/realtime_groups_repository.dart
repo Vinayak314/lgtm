@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:firebase_database/firebase_database.dart';
@@ -47,6 +48,80 @@ class RealtimeGroupsRepository implements LgtmGroupsRepository {
     } catch (failure) {
       throw LgtmGroupsException.forFailure(failure);
     }
+  }
+
+  @override
+  Stream<List<LgtmGroup>> watchGroups({required LgtmMember member}) {
+    late final StreamController<List<LgtmGroup>> controller;
+    StreamSubscription<DatabaseEvent>? indexSubscription;
+    StreamSubscription<DatabaseEvent>? profileSubscription;
+    final groupSubscriptions = <String, StreamSubscription<DatabaseEvent>>{};
+    var refreshVersion = 0;
+
+    Future<void> refresh() async {
+      final version = ++refreshVersion;
+      try {
+        final groups = await _readGroupsFor(member);
+        if (!controller.isClosed && version == refreshVersion) {
+          controller.add(groups);
+        }
+      } catch (failure) {
+        if (!controller.isClosed && version == refreshVersion) {
+          controller.addError(LgtmGroupsException.forFailure(failure));
+        }
+      }
+    }
+
+    void watchIndexedGroups(DataSnapshot snapshot) {
+      final ids = {
+        for (final entry in jsonAsMap(snapshot.value).entries)
+          if (entry.value == true) entry.key,
+      };
+      for (final id in groupSubscriptions.keys.toList()) {
+        if (!ids.contains(id)) {
+          unawaited(groupSubscriptions.remove(id)?.cancel());
+        }
+      }
+      for (final id in ids) {
+        groupSubscriptions.putIfAbsent(id, () {
+          return _database.ref('groups/$id').onValue.listen(
+            (_) => unawaited(refresh()),
+            onError: (Object failure) => controller.addError(
+              LgtmGroupsException.forFailure(failure),
+            ),
+          );
+        });
+      }
+      unawaited(refresh());
+    }
+
+    controller = StreamController<List<LgtmGroup>>(
+      onListen: () {
+        indexSubscription = _database
+            .ref('userGroups/${member.id}')
+            .onValue
+            .listen(
+              (event) => watchIndexedGroups(event.snapshot),
+              onError: (Object failure) => controller.addError(
+                LgtmGroupsException.forFailure(failure),
+              ),
+            );
+        profileSubscription = _database.ref('publicProfiles').onValue.listen(
+          (_) => unawaited(refresh()),
+          onError: (Object failure) => controller.addError(
+            LgtmGroupsException.forFailure(failure),
+          ),
+        );
+      },
+      onCancel: () async {
+        await indexSubscription?.cancel();
+        await profileSubscription?.cancel();
+        for (final subscription in groupSubscriptions.values) {
+          await subscription.cancel();
+        }
+      },
+    );
+    return controller.stream;
   }
 
   Future<List<LgtmGroup>> _readGroupsFor(LgtmMember member) async {
@@ -219,8 +294,7 @@ class RealtimeGroupsRepository implements LgtmGroupsRepository {
   }
 
   /// Invite codes avoid the characters people misread (0/O, 1/I/L) so a code
-  /// can be read out loud over a table. Shared with the mock so both produce
-  /// codes the same shape.
+  /// can be read out loud over a table.
   static const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
   static String newInviteCode([Random? random]) {

@@ -324,6 +324,13 @@ class _FakeAuth implements LgtmAuthRepository {
   }
 
   @override
+  Future<LgtmUser?> signInWithGoogle() async {
+    calls.add('signInWithGoogle');
+    if (failure != null) throw LgtmAuthException(failure!);
+    return _purva;
+  }
+
+  @override
   Future<LgtmUser> signUp({
     required String displayName,
     required String email,

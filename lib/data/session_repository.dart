@@ -12,7 +12,7 @@ class LgtmSessionException implements Exception {
 
 /// Abstract contract for real-time session management.
 abstract class LgtmSessionRepository {
-  /// Creates a new session in Firebase Realtime Database or in memory.
+  /// Creates a new session in Firebase Realtime Database.
   ///
   /// Host fetches up to 15 options using TMDB or Places API and stores them in the session.
   Future<LgtmSession> createSession({

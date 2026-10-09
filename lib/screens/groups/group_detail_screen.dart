@@ -118,7 +118,7 @@ class GroupDetailScreen extends StatelessWidget {
                   ),
                 _MemberRow(
                   member: group.members[i],
-                  isYou: group.members[i].id == store.currentMember.id,
+                  isYou: group.members[i].id == store.currentMember?.id,
                 ),
               ],
             ],

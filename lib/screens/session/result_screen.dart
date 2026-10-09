@@ -63,12 +63,18 @@ class _ResultScreenState extends State<ResultScreen>
 
   @override
   Widget build(BuildContext context) {
-    final args = widget.args ?? const ResultArgs(
-      winnerName: 'Spicy Basil Thai',
-      rating: 4.8,
-      priceLevel: '\$\$',
-      distance: '0.5 MI',
-    );
+    final args = widget.args;
+    if (args == null) {
+      return const Scaffold(
+        backgroundColor: LgtmColors.bg,
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(LgtmLayout.gutter),
+            child: Text('A session result is not available.'),
+          ),
+        ),
+      );
+    }
 
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final topInset = MediaQuery.paddingOf(context).top;

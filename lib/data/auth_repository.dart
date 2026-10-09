@@ -19,8 +19,7 @@ class LgtmAuthException implements Exception {
 /// Everything the app needs from "who is signed in, and can they sign in".
 ///
 /// [LgtmSession] is the only caller. Screens never see this interface, they go
-/// through the session, so replacing the mock with Firebase Auth later touches
-/// this file and the one that implements it, and nothing else.
+/// through the session, so Firebase Auth remains isolated from the screens.
 abstract class LgtmAuthRepository {
   /// Works out whether anybody is signed in from whatever survives a restart.
   /// Resolves to null when nobody is.
@@ -29,6 +28,9 @@ abstract class LgtmAuthRepository {
   /// Signs in with a credential the storage already trusts. Throws
   /// [LgtmAuthException] when the password does not match.
   Future<LgtmUser> signIn({required String email, required String password});
+
+  /// Signs in with Google. Returns null when the person cancels the flow.
+  Future<LgtmUser?> signInWithGoogle();
 
   /// Creates the account and signs in. Throws [LgtmAuthException] when the
   /// address is already taken.

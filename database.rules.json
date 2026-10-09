@@ -26,8 +26,6 @@
       }
     },
 
-    // A code points at a group id, and group ids come from push(), so the
-    // value is 21 characters. The cap only exists to bound the write.
     "inviteCodes": {
       ".read": "auth != null",
 
@@ -42,9 +40,6 @@
         ".read": "auth != null && auth.uid === $uid",
 
         "$gid": {
-          // Joining adds the entry once the group already lists the member.
-          // Dropping it is always allowed: it only ever hides a group from the
-          // person dropping it, and joining again puts it back.
           ".write": "auth != null && auth.uid === $uid && ((newData.val() === true && root.child('groups').child($gid).child('members').child($uid).val() === true) || newData.val() === null)",
           ".validate": "newData.val() === true || newData.val() === null"
         }

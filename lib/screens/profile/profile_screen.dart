@@ -20,8 +20,7 @@ import '../../widgets/states/lgtm_confirm_dialog.dart';
 ///
 /// The display name is the one thing a person can change for themselves, so it
 /// is editable here and validated with the same rule Sign Up used. Signing out
-/// asks first, because it throws away the mock session and there is no way back
-/// without signing in again.
+/// asks first because it ends the current authenticated session.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -36,13 +35,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _nameError;
   bool _saving = false;
   bool _signingOut = false;
-  bool _seeded = false;
+  bool _initialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_seeded) return;
-    _seeded = true;
+    if (_initialized) return;
+    _initialized = true;
 
     final user = LgtmSessionScope.of(context).user;
     _name.text = user?.displayName ?? '';

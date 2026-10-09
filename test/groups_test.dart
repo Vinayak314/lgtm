@@ -10,6 +10,7 @@ import 'package:lgtm/screens/groups/create_group_screen.dart';
 import 'package:lgtm/screens/groups/group_detail_screen.dart';
 import 'package:lgtm/screens/groups/groups_hub_screen.dart';
 import 'package:lgtm/screens/groups/join_group_screen.dart';
+import 'package:lgtm/screens/session/session_setup_screen.dart';
 import 'package:lgtm/widgets/lgtm_card.dart';
 import 'package:lgtm/widgets/lgtm_pill.dart';
 
@@ -278,15 +279,15 @@ void main() {
       expect(find.byType(JoinGroupScreen), findsOneWidget);
     });
 
-    testWidgets('tabs that are not built yet say so', (
+    testWidgets('swipe tab opens session setup for the first group', (
       WidgetTester tester,
     ) async {
       await openHub(tester);
 
-      await tester.tap(find.text('Swipe'));
-      await tester.pump();
+      await tapTo(tester, find.text('Swipe'));
 
-      expect(find.text('The swipe flow is not built yet.'), findsOneWidget);
+      expect(find.byType(SessionSetupScreen), findsOneWidget);
+      expect(find.text('Choose Activity Category'), findsOneWidget);
     });
   });
 
@@ -495,16 +496,16 @@ void main() {
       expect(find.text('Sharing is not connected yet.'), findsOneWidget);
     });
 
-    testWidgets('starting a session says the setup screen is not built', (
+    testWidgets('starting a session opens session setup for the group', (
       WidgetTester tester,
     ) async {
       await openHub(tester, store: fastStore(seed: const [_roommates]));
 
       await tapTo(tester, find.text('Roommates'));
-      await tester.tap(find.text('Start Session'));
-      await tester.pump();
+      await tapTo(tester, find.text('Start Session'));
 
-      expect(find.text('Session setup is not built yet.'), findsOneWidget);
+      expect(find.byType(SessionSetupScreen), findsOneWidget);
+      expect(find.text('Choose Activity Category'), findsOneWidget);
     });
 
     testWidgets('a group id nobody has shows the not found state', (

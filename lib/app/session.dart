@@ -2,7 +2,6 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
 import '../data/auth_repository.dart';
-import '../data/in_memory_auth_repository.dart';
 
 export '../data/auth_repository.dart';
 
@@ -14,27 +13,10 @@ export '../data/auth_repository.dart';
 /// the data, so the Firebase Auth implementation can slot in without a screen
 /// changing.
 ///
-/// With no repository passed in it builds the in-memory mock, which is why the
-/// app still runs with no Firebase project.
 class LgtmSession extends ChangeNotifier {
   LgtmSession({
-    this.restoreDelay = const Duration(milliseconds: 700),
-    this.authDelay = const Duration(milliseconds: 800),
-    LgtmAuthRepository? repository,
-  }) : _repository =
-           repository ??
-           LgtmInMemoryAuthRepository(
-             delay: authDelay,
-             restoreDelay: restoreDelay,
-           );
-
-  /// How long [restore] pretends to wait. Kept for the mock: the Firebase
-  /// implementation takes whatever its own restore actually costs.
-  final Duration restoreDelay;
-
-  /// How long a sign in or sign up pretends to take. Same reasoning as
-  /// [restoreDelay].
-  final Duration authDelay;
+    required LgtmAuthRepository repository,
+  }) : _repository = repository;
 
   final LgtmAuthRepository _repository;
 
@@ -51,8 +33,7 @@ class LgtmSession extends ChangeNotifier {
   String? get error => _error;
 
   /// Works out whether anybody is signed in. The auth gate calls this once at
-  /// launch. With the mock and no persistence there is nobody, so it resolves
-  /// signed out.
+  /// launch.
   Future<void> restore() async {
     final restored = await _repository.restore();
     if (_status != AuthStatus.unknown) return;
@@ -65,6 +46,28 @@ class LgtmSession extends ChangeNotifier {
   /// Signs in with an email and password.
   Future<bool> signIn({required String email, required String password}) =>
       _authenticate(() => _repository.signIn(email: email, password: password));
+
+  /// Signs in with Google. A cancelled picker leaves the person signed out.
+  Future<bool> signInWithGoogle() async {
+    _error = null;
+    notifyListeners();
+
+    try {
+      final user = await _repository.signInWithGoogle();
+      if (user == null) return false;
+      _user = user;
+    } on LgtmAuthException catch (failure) {
+      _user = null;
+      _status = AuthStatus.signedOut;
+      _error = failure.message;
+      notifyListeners();
+      return false;
+    }
+
+    _status = AuthStatus.signedIn;
+    notifyListeners();
+    return true;
+  }
 
   /// Creates the account and signs in.
   Future<bool> signUp({

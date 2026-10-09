@@ -5,7 +5,7 @@
 ## Overview
 **LGTM** is a mobile app built with Flutter that helps groups of friends, roommates, or family members quickly agree on a shared activity — what movie to watch, or where to eat without the usual back-and-forth of a group chat. 
 
-Users swipe through real options (sourced live from public APIs, not mock data) on their own phones, and the app detects the moment everyone has swiped right on the same thing, revealing it to the whole group instantly.
+Firebase authentication and group data are connected. Live session creation, voting, and results still need to be wired to the session repository before that flow is available.
 
 ## Key Features
 - **Group Sessions:** Easily invite friends, roommates, or family to a shared decision-making session.
@@ -70,29 +70,6 @@ sessions/{sid}      { groupId, hostId, status, category, radius, cards,
 ```
 
 `userGroups` exists because the database grants a query only when the whole queried path is readable. Querying `groups` would mean reading every group in the app.
-
-## Demo mode
-
-A build can run on the in-memory mocks instead of Firebase: no project, no rules, no network, and the groups it starts with are the seeded ones.
-
-```bash
-# On a device or emulator
-flutter run --dart-define=LGTM_DEMO=true
-
-# An installable demo APK
-flutter build apk --debug --dart-define=LGTM_DEMO=true
-```
-
-| | |
-|---|---|
-| Email | `demo@lgtm.app` |
-| Password | `lgtm-demo` |
-| Groups | Roommates (`vYzA1`, three finished sessions), Hackathon Squad (`x7ZA1`) |
-| Signed in as | Purva, the mock member every screen marks as you |
-
-Any filled in pair signs in, because the mock is what the demo runs on. The login screen shows this card, and tapping it fills the form, so nothing has to be guessed or typed by hand.
-
-The flag lives in `lib/app/demo_mode.dart`. `main.dart` skips initialising Firebase when it is on and hands `LgtmApp` no repositories, which is what every screen already falls back to when it has none. Without the flag the app talks to `lgtm-app` exactly as before.
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.

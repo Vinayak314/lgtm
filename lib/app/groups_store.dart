@@ -4,7 +4,6 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
 import '../data/groups_repository.dart';
-import '../data/in_memory_groups_repository.dart';
 
 export '../data/groups_repository.dart';
 
@@ -16,24 +15,14 @@ export '../data/groups_repository.dart';
 /// the data, so the Realtime Database implementation can slot in without a
 /// screen changing.
 ///
-/// With no repository passed in it builds the in-memory mock, which is why the
-/// app still runs with no Firebase project.
 class LgtmGroupsStore extends ChangeNotifier {
-  /// Builds a store. [seed] replaces the mock groups, so tests can start from
-  /// a known list (or an empty one), and [repository] swaps the storage out.
+  /// Builds a store backed by the configured groups repository.
   LgtmGroupsStore({
-    this.delay = const Duration(milliseconds: 600),
     this.timeout = firstLoadTimeout,
-    List<LgtmGroup>? seed,
     LgtmMember? currentMember,
-    LgtmGroupsRepository? repository,
-  }) : _currentMember = currentMember ?? lgtmMockMember,
-       _repository =
-           repository ?? LgtmInMemoryGroupsRepository(delay: delay, seed: seed);
-
-  /// How long the mock takes. Ignored when a [repository] is passed in, which
-  /// has its own idea of how long a read costs.
-  final Duration delay;
+    required LgtmGroupsRepository repository,
+  }) : _currentMember = currentMember,
+       _repository = repository;
 
   /// How long the first load may take before it is called a failure. A spinner
   /// with no ceiling is the same as a spinner that never ends.
@@ -42,11 +31,12 @@ class LgtmGroupsStore extends ChangeNotifier {
   /// The ceiling on one load, [firstLoadTimeout] unless a test wants it faster.
   final Duration timeout;
 
-  LgtmMember _currentMember;
+  LgtmMember? _currentMember;
+  StreamSubscription<List<LgtmGroup>>? _groupsSubscription;
 
   /// The signed in member. The member lists mark this row as you, and every
   /// read is scoped to this member's uid.
-  LgtmMember get currentMember => _currentMember;
+  LgtmMember? get currentMember => _currentMember;
 
   final LgtmGroupsRepository _repository;
   List<LgtmGroup> _groups = [];
@@ -69,7 +59,7 @@ class LgtmGroupsStore extends ChangeNotifier {
 
   /// True when this member is already in the group.
   bool isMember(LgtmGroup group) =>
-      group.members.any((member) => member.id == currentMember.id);
+      group.members.any((member) => member.id == currentMember?.id);
 
   LgtmGroup? groupById(String id) {
     for (final group in _groups) {
@@ -78,9 +68,8 @@ class LgtmGroupsStore extends ChangeNotifier {
     return null;
   }
 
-  /// Loads the groups once. The app shell calls this at launch so any screen
-  /// can count groups without being the one that fetched them; the hub calls
-  /// it again on its first build, which does nothing.
+  /// Loads the groups and starts watching for Firebase updates. The app shell
+  /// shares this store so every screen sees the same live group data.
   ///
   /// A read that fails still ends the loading state, otherwise the hub would
   /// sit on its spinner forever. The reason lands in [error].
@@ -92,14 +81,35 @@ class LgtmGroupsStore extends ChangeNotifier {
     _loading = true;
 
     try {
+      final member = _currentMember;
+      if (member == null) {
+        _error = 'Sign in to load your groups.';
+        return;
+      }
       _groups = await _repository
-          .loadGroups(member: currentMember)
+          .loadGroups(member: member)
           .timeout(timeout);
+      await _groupsSubscription?.cancel();
+      _groupsSubscription = _repository.watchGroups(member: member).listen(
+        (groups) {
+          _groups = groups;
+          _error = null;
+          _ready = true;
+          notifyListeners();
+        },
+        onError: (Object failure) {
+          _error = failure is LgtmGroupsException
+              ? failure.message
+              : 'Something went wrong loading your groups.';
+          _ready = true;
+          notifyListeners();
+        },
+      );
     } on TimeoutException {
       _error = 'LGTM did not answer in time.';
     } on LgtmGroupsException catch (failure) {
       _error = failure.message;
-    } catch (failure) {
+    } catch (_) {
       // The safety net: an error type the repository did not name still ends the
       // loading state and still says why.
       _error = 'Something went wrong loading your groups.';
@@ -129,7 +139,7 @@ class LgtmGroupsStore extends ChangeNotifier {
     try {
       final group = await _repository.createGroup(
         name: name,
-        member: currentMember,
+        member: _requireCurrentMember(),
       );
       _groups = [group, ..._groups];
       return group;
@@ -152,7 +162,7 @@ class LgtmGroupsStore extends ChangeNotifier {
     try {
       final joined = await _repository.joinWithCode(
         code: code,
-        member: currentMember,
+        member: _requireCurrentMember(),
       );
       _applyJoined(joined);
       return true;
@@ -189,13 +199,27 @@ class LgtmGroupsStore extends ChangeNotifier {
   /// when the session changes, which is why nothing here has to know about
   /// auth.
   void setCurrentMember(LgtmMember member) {
-    if (member.id == _currentMember.id) return;
+    if (member.id == _currentMember?.id) return;
 
+    unawaited(_groupsSubscription?.cancel());
+    _groupsSubscription = null;
     _currentMember = member;
     _groups = [];
     _ready = false;
     _error = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    unawaited(_groupsSubscription?.cancel());
+    super.dispose();
+  }
+
+  LgtmMember _requireCurrentMember() {
+    final member = _currentMember;
+    if (member == null) throw const LgtmGroupsException('Sign in to continue.');
+    return member;
   }
 
   /// Clears the last failure message once the form has been edited.

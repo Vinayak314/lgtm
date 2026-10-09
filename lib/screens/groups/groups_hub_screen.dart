@@ -99,9 +99,6 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
       body: Column(
         children: [
           LgtmTopBar(
-            leading: LgtmMenuButton(
-              onPressed: () => _say('The menu is not built yet.'),
-            ),
             center: const LgtmLogo(size: 30, color: LgtmColors.primary),
             actions: [
               LgtmAvatar(

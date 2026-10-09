@@ -52,8 +52,7 @@ class LgtmGroupsException implements Exception {
 /// Everything the app needs from "my groups".
 ///
 /// [LgtmGroupsStore] is the only caller. Screens go through the store, so
-/// replacing the mock with Realtime Database later touches the implementation
-/// and nothing else.
+/// Realtime Database remains isolated from the screens.
 ///
 /// The acting [LgtmMember] is passed in rather than held, so the repository
 /// never has its own idea of who is signed in and can never disagree with the
@@ -62,9 +61,13 @@ abstract class LgtmGroupsRepository {
   /// The groups to put on the hub, newest first.
   ///
   /// The Realtime Database implementation queries on `members/{uid}`, so it
-  /// can only see groups the member is in. The mock is handed this account's
-  /// groups already.
+  /// can only see groups the member is in.
   Future<List<LgtmGroup>> loadGroups({required LgtmMember member});
+
+  /// Watches group changes. Implementations without a live data source emit the
+  /// current result once; Firebase implementations can keep the stream live.
+  Stream<List<LgtmGroup>> watchGroups({required LgtmMember member}) =>
+      Stream<List<LgtmGroup>>.fromFuture(loadGroups(member: member));
 
   /// Creates a group owned by [member] and returns it.
   Future<LgtmGroup> createGroup({

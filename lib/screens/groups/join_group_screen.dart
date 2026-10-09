@@ -110,7 +110,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
                   LgtmCard(
                     child: LgtmTextField(
                       label: 'Group Code',
-                      hint: 'Sample: x7ZA1',
+                      hint: 'Enter invite code',
                       controller: _code,
                       focusNode: _codeFocus,
                       errorText: _codeError,

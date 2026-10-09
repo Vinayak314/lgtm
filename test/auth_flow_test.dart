@@ -172,7 +172,7 @@ void main() {
       expect(find.text('Enter your email address.'), findsNothing);
     });
 
-    testWidgets('the social buttons say they are not connected yet', (
+    testWidgets('Google sign in opens the groups hub and Apple is not shown', (
       WidgetTester tester,
     ) async {
       usePhoneWindow(tester);
@@ -181,8 +181,10 @@ void main() {
 
       await tester.tap(find.text('Continue with Google'));
       await tester.pump();
+      await pumpUntil(tester, find.text('My Groups'));
 
-      expect(find.text('Google sign in is not connected yet.'), findsOneWidget);
+      expect(find.text('My Groups'), findsOneWidget);
+      expect(find.text('Continue with Apple'), findsNothing);
     });
 
     testWidgets('login offers a way to sign up', (WidgetTester tester) async {

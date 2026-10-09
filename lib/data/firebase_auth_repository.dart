@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../models/json.dart';
 import 'auth_repository.dart';
@@ -12,14 +13,21 @@ import 'auth_repository.dart';
 /// both, and every failure comes back as an [LgtmAuthException] with a
 /// sentence a form can show as is, because "FirebaseException" helps nobody.
 class FirebaseAuthRepository implements LgtmAuthRepository {
-  FirebaseAuthRepository({FirebaseAuth? auth, FirebaseDatabase? database})
-    : _auth = auth ?? FirebaseAuth.instance,
-      _database = database ?? FirebaseDatabase.instance;
+  FirebaseAuthRepository({
+    FirebaseAuth? auth,
+    FirebaseDatabase? database,
+    GoogleSignIn? googleSignIn,
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _database = database ?? FirebaseDatabase.instance,
+       _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
 
   final FirebaseAuth _auth;
 
   /// Where `users/{uid}` lives.
   final FirebaseDatabase _database;
+  final GoogleSignIn _googleSignIn;
+  Future<void>? _googleSignInInitialization;
+  bool _googleSignInInitialized = false;
 
   /// Reads the profile for the signed in user, once [restore] or a sign in has
   /// resolved. Null until then.
@@ -71,6 +79,40 @@ class FirebaseAuthRepository implements LgtmAuthRepository {
   }
 
   @override
+  Future<LgtmUser?> signInWithGoogle() async {
+    try {
+      _googleSignInInitialization ??= _googleSignIn.initialize();
+      await _googleSignInInitialization;
+      _googleSignInInitialized = true;
+
+      final googleUser = await _googleSignIn.authenticate();
+      final idToken = googleUser.authentication.idToken;
+      if (idToken == null) {
+        throw const LgtmAuthException(
+          'Google did not return an ID token. Check the Google sign-in setup.',
+        );
+      }
+
+      final credential = GoogleAuthProvider.credential(idToken: idToken);
+      final result = await _auth.signInWithCredential(credential);
+      final user = result.user;
+      if (user == null) {
+        throw const LgtmAuthException('Google sign in did not work.');
+      }
+
+      _user = await _readProfile(user);
+      return _user;
+    } on GoogleSignInException catch (failure) {
+      if (failure.code == GoogleSignInExceptionCode.canceled) return null;
+      throw LgtmAuthException(_messageForGoogleSignIn(failure));
+    } on FirebaseAuthException catch (failure) {
+      throw LgtmAuthException(_messageFor(failure));
+    } on FirebaseException catch (failure) {
+      throw LgtmAuthException(_messageForDatabase(failure));
+    }
+  }
+
+  @override
   Future<LgtmUser> signUp({
     required String displayName,
     required String email,
@@ -106,7 +148,12 @@ class FirebaseAuthRepository implements LgtmAuthRepository {
   }
 
   @override
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    if (_googleSignInInitialized) {
+      await _googleSignIn.signOut();
+    }
+    await _auth.signOut();
+  }
 
   @override
   Future<void> updateDisplayName(String displayName) async {
@@ -199,6 +246,13 @@ class FirebaseAuthRepository implements LgtmAuthRepository {
         'network-request-failed' =>
           'No connection. Check the network and try again.',
         _ => 'Something went wrong. Try again.',
+      };
+
+  static String _messageForGoogleSignIn(GoogleSignInException failure) =>
+      switch (failure.code) {
+        GoogleSignInExceptionCode.clientConfigurationError => 'Google sign-in setup is incomplete on this device. Enable Google in Firebase Authentication, add the Android SHA-1, and replace google-services.json with a fresh download.',
+        GoogleSignInExceptionCode.canceled => 'Google sign in was cancelled.',
+        _ => 'We could not sign you in with Google. Please try again.',
       };
 
   /// The same for a profile write the database refused, which is a different

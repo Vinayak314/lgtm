@@ -111,6 +111,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
         .pushNamedAndRemoveUntil(LgtmRoutes.groups, (route) => false);
   }
 
+  Future<void> _signInWithGoogle() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _submitting = true;
+      _formError = null;
+    });
+
+    final session = LgtmSessionScope.read(context);
+    final signedIn = await session.signInWithGoogle();
+    if (!mounted) return;
+
+    if (!signedIn || !session.isSignedIn) {
+      setState(() {
+        _submitting = false;
+        _formError = session.error;
+      });
+      return;
+    }
+
+    await Navigator.of(context)
+        .pushNamedAndRemoveUntil(LgtmRoutes.groups, (route) => false);
+  }
+
   void _onChanged() {
     if (_nameError == null &&
         _emailError == null &&
@@ -258,7 +281,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     onPressed: _submitting ? null : _submit,
                   ),
                   const SizedBox(height: 24),
-                  const LgtmSocialButtons(),
+                  LgtmSocialButtons(
+                    onGooglePressed: _signInWithGoogle,
+                    isLoading: _submitting,
+                  ),
                   const SizedBox(height: 8),
                   Center(
                     child: TextButton(

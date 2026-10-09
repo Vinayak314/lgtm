@@ -7,9 +7,7 @@ import 'user.dart';
 ///
 /// [avatarColor] is not stored. The database knows a uid and a display name,
 /// nothing else, so the colour is derived from the id: everyone keeps the same
-/// avatar on every device without writing a byte of styling data. The old
-/// mock passes a colour in, which is still the easiest way to build a member
-/// in a test.
+/// avatar on every device without writing styling data.
 class LgtmMember {
   const LgtmMember({
     required this.id,
@@ -60,8 +58,7 @@ Color avatarColorFor(String id) {
   return _avatarPalette[hash % _avatarPalette.length];
 }
 
-/// The same muted palette the mocks used, so derived avatars sit next to the
-/// hand written ones without a jump in colour.
+/// Muted colours used for derived avatars.
 const List<Color> _avatarPalette = [
   Color(0xFF4A4A4A),
   Color(0xFF2F5D5B),

@@ -13,7 +13,7 @@ class LgtmUser {
     this.fcmToken,
   });
 
-  /// Firebase Auth uid. Empty in the mock, where nobody has signed up yet.
+  /// Firebase Auth uid.
   final String uid;
 
   final String displayName;

@@ -27,12 +27,10 @@ class LgtmApp extends StatefulWidget {
   /// Overridden by tests that need to start already signed in, or signed out.
   final LgtmSession? session;
 
-  /// Where auth is stored. `main.dart` passes Firebase Auth; left out, as in
-  /// every test, the in-memory mock is used, which is why the app also runs
-  /// with no Firebase project behind it.
+  /// Where authentication is stored.
   final LgtmAuthRepository? authRepository;
 
-  /// Where groups are stored, with the same fallback as [authRepository].
+  /// Where groups are stored.
   final LgtmGroupsRepository? groupsRepository;
 
   @override
@@ -42,14 +40,17 @@ class LgtmApp extends StatefulWidget {
 class _LgtmAppState extends State<LgtmApp> {
   /// One session for the life of the app. Every screen reads it through
   /// [LgtmSessionScope].
-  late final LgtmSession _session =
-      widget.session ?? LgtmSession(repository: widget.authRepository);
+  late final LgtmSession _session = widget.session ?? LgtmSession(
+    repository: widget.authRepository ??
+        (throw StateError('LgtmApp requires an authentication repository.')),
+  );
 
   /// Same story for the groups: one store for the whole app, shared with every
   /// route through [LgtmGroupsScope].
-  late final LgtmGroupsStore _groups =
-      widget.groupsStore ??
-      LgtmGroupsStore(repository: widget.groupsRepository);
+  late final LgtmGroupsStore _groups = widget.groupsStore ?? LgtmGroupsStore(
+    repository: widget.groupsRepository ??
+        (throw StateError('LgtmApp requires a groups repository.')),
+  );
 
   @override
   void initState() {
@@ -71,8 +72,7 @@ class _LgtmAppState extends State<LgtmApp> {
 
   /// Puts the signed in person in the groups store as its current member.
   ///
-  /// The mock store keeps its own member, which is why nothing happens while a
-  /// test runs on the mock: a user with no uid cannot be a real member.
+  /// Keeps the group store scoped to the signed-in Firebase user.
   void _followSignedInUser() {
     final user = _session.user;
     if (user == null || user.uid.isEmpty) return;
