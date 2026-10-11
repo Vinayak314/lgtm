@@ -10,9 +10,11 @@ import '../../data/session_repository.dart';
 import 'package:provider/provider.dart';
 import '../../blocs/session/session_bloc.dart';
 import '../../blocs/session/session_event.dart';
+import '../../models/session.dart';
 import '../../widgets/lgtm_buttons.dart';
 import '../../widgets/lgtm_top_bar.dart';
 import 'lobby_screen.dart';
+import 'swipe_screen.dart';
 
 /// Arguments for the session setup screen.
 class SessionSetupArgs {
@@ -72,20 +74,53 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
         return;
       }
 
+      // Fetch current session state to decide the right screen.
+      final session = await repository.fetchSession(activeSessionId);
+      if (!mounted) return;
+
+      if (session == null) {
+        // Session was deleted or doesn't exist. Clear the stale pointer.
+        setState(() => _checkingActiveSession = false);
+        return;
+      }
+
       final bloc = SessionBloc(
         repository: repository,
         currentUserId: user.uid,
-      )..add(JoinLobbyEvent(sessionId: activeSessionId));
+      );
 
       setState(() => _redirectedToActiveSession = true);
-      await Navigator.of(context).pushReplacementNamed(
-        LgtmRoutes.sessionLobby,
-        arguments: LobbyArgs(
-          groupId: args.groupId,
-          sessionId: activeSessionId,
-          bloc: bloc,
-        ),
-      );
+
+      switch (session.status) {
+        case SessionStatus.lobby:
+          // Lobby is still open — join normally.
+          bloc.add(JoinLobbyEvent(sessionId: activeSessionId));
+          await Navigator.of(context).pushReplacementNamed(
+            LgtmRoutes.sessionLobby,
+            arguments: LobbyArgs(
+              groupId: args.groupId,
+              sessionId: activeSessionId,
+              bloc: bloc,
+            ),
+          );
+          break;
+
+        case SessionStatus.active:
+        case SessionStatus.finished:
+          // Session already started or finished. Rejoin without writing
+          // to participants — just subscribe to the stream.
+          bloc.add(RejoinSessionEvent(sessionId: activeSessionId));
+          await Navigator.of(context).pushReplacementNamed(
+            LgtmRoutes.sessionSwipe,
+            arguments: SwipeArgs(
+              groupId: args.groupId,
+              sessionId: activeSessionId,
+              category: session.category.wire,
+              bloc: bloc,
+            ),
+          );
+          break;
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() => _checkingActiveSession = false);

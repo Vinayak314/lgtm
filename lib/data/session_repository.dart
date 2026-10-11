@@ -26,6 +26,9 @@ abstract class LgtmSessionRepository {
     double radiusMiles = 5.0,
   });
 
+  /// One-shot read of a session snapshot.
+  Future<LgtmSession?> fetchSession(String sessionId);
+
   /// Real-time stream of session updates (lobby members, status, cards, votes, winner).
   Stream<LgtmSession?> watchSession(String sessionId);
 

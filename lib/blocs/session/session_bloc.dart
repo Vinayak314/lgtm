@@ -61,6 +61,8 @@ class SessionBloc {
       await _onStarted(event);
     } else if (event is JoinLobbyEvent) {
       await _onJoinLobby(event);
+    } else if (event is RejoinSessionEvent) {
+      await _onRejoinSession(event);
     } else if (event is BeginSwipingEvent) {
       await _onBeginSwiping(event);
     } else if (event is CardSwipedEvent) {
@@ -79,7 +81,7 @@ class SessionBloc {
 
       final List<OptionCard> cards;
       if (category == SessionCategory.movie) {
-        cards = await _movieApi.fetchMovieDeck(limit: 6);
+        cards = await _movieApi.fetchMovieDeck(limit: 5);
       } else {
         cards = await _placesApi.fetchPlacesDeck(
           radiusMiles: event.radiusMiles,
@@ -108,7 +110,7 @@ class SessionBloc {
   }
 
   Future<void> _onJoinLobby(JoinLobbyEvent event) async {
-    _emit(const SessionLoadingState(message: 'Joining lobby...'));
+    _emit(const SessionLoadingState(message: 'Joining session...'));
     try {
       await _repository.joinLobby(
         sessionId: event.sessionId,
@@ -116,8 +118,16 @@ class SessionBloc {
       );
       _subscribeToSession(event.sessionId);
     } catch (e) {
-      _emit(SessionErrorState('Failed to join lobby: $e'));
+      _emit(SessionErrorState('Failed to join session: $e'));
     }
+  }
+
+  /// Rejoin an active or finished session without attempting to write to
+  /// participants. Just subscribe to the stream — _onSessionUpdated will
+  /// recover the correct UI state from Firebase.
+  Future<void> _onRejoinSession(RejoinSessionEvent event) async {
+    _emit(const SessionLoadingState(message: 'Reconnecting...'));
+    _subscribeToSession(event.sessionId);
   }
 
   Future<void> _onBeginSwiping(BeginSwipingEvent event) async {
@@ -169,7 +179,18 @@ class SessionBloc {
       return;
     }
 
-    // Check winner first
+    // ---- Recover _localIndex from Firebase votes ----
+    // Count how many cards this user has already voted on so that a
+    // fresh bloc (e.g. after back-press) picks up where the user left off.
+    int votedCount = 0;
+    for (final entry in session.votes.entries) {
+      if (entry.value.containsKey(_currentUserId)) {
+        votedCount++;
+      }
+    }
+    _localIndex = votedCount;
+
+    // ---- Check winner first (already declared in Firebase) ----
     if (session.winner != null) {
       final winnerCard = session.cards.firstWhere(
         (c) => c.id == session.winner!.cardId,
@@ -185,10 +206,14 @@ class SessionBloc {
       return;
     }
 
-    // Only the host may finalize the session under the Firebase rules. The
-    // other participants receive the finished snapshot through the stream.
+    // ---- Host attempts to declare the winner ----
+    // Firebase rules only allow the host to write winner + status. Non-host
+    // participants will receive the finished snapshot through the stream.
+    // The key improvement: the host now attempts this on every stream update
+    // (including after rejoin), not just while continuously subscribed.
     if (session.status == SessionStatus.active &&
-        session.hostId == _currentUserId) {
+        session.hostId == _currentUserId &&
+        session.allParticipantsFinished) {
       final declaredWinner = await _repository.checkAndDeclareWinner(
         sessionId: session.id,
         session: session,
@@ -245,19 +270,15 @@ class SessionBloc {
         break;
 
       case SessionStatus.finished:
-        if (session.winner != null) {
-          final winnerCard = session.cards.firstWhere(
-            (c) => c.id == session.winner!.cardId,
-            orElse: () => session.cards.first,
-          );
-          _emit(
-            SessionWonState(
-              session: session,
-              winnerCard: winnerCard,
-              winnerType: session.winner!.type,
-            ),
-          );
-        }
+        // Session finished but winner field missing (edge case / stale data).
+        // Show waiting rather than a blank screen.
+        _emit(
+          SessionWaitingState(
+            session: session,
+            finishedCount: session.finishedIds.length,
+            totalParticipants: session.participantIds.length,
+          ),
+        );
         break;
     }
   }

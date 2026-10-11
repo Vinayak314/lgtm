@@ -86,25 +86,25 @@ class LgtmGroupsStore extends ChangeNotifier {
         _error = 'Sign in to load your groups.';
         return;
       }
-      _groups = await _repository
-          .loadGroups(member: member)
-          .timeout(timeout);
+      _groups = await _repository.loadGroups(member: member).timeout(timeout);
       await _groupsSubscription?.cancel();
-      _groupsSubscription = _repository.watchGroups(member: member).listen(
-        (groups) {
-          _groups = groups;
-          _error = null;
-          _ready = true;
-          notifyListeners();
-        },
-        onError: (Object failure) {
-          _error = failure is LgtmGroupsException
-              ? failure.message
-              : 'Something went wrong loading your groups.';
-          _ready = true;
-          notifyListeners();
-        },
-      );
+      _groupsSubscription = _repository
+          .watchGroups(member: member)
+          .listen(
+            (groups) {
+              _groups = groups;
+              _error = null;
+              _ready = true;
+              notifyListeners();
+            },
+            onError: (Object failure) {
+              _error = failure is LgtmGroupsException
+                  ? failure.message
+                  : 'Something went wrong loading your groups.';
+              _ready = true;
+              notifyListeners();
+            },
+          );
     } on TimeoutException {
       _error = 'LGTM did not answer in time.';
     } on LgtmGroupsException catch (failure) {
@@ -127,6 +127,22 @@ class LgtmGroupsStore extends ChangeNotifier {
     _ready = false;
     notifyListeners();
     await load();
+  }
+
+  /// Re-reads group state after a session changes it outside this store.
+  Future<void> refresh() async {
+    final member = _currentMember;
+    if (member == null) return;
+    try {
+      final groups = await _repository.loadGroups(member: member);
+      _groups = groups;
+      _error = null;
+      _ready = true;
+      notifyListeners();
+    } on LgtmGroupsException catch (failure) {
+      _error = failure.message;
+      notifyListeners();
+    }
   }
 
   /// Creates a group owned by [currentMember] and puts it at the top of the
@@ -176,24 +192,24 @@ class LgtmGroupsStore extends ChangeNotifier {
   }
 
   Future<bool> leaveGroup(LgtmGroup group) async {
-      _busy = true;
-      _error = null;
+    _busy = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await _repository.leaveGroup(
+        group: group,
+        member: _requireCurrentMember(),
+      );
+      _groups = _groups.where((item) => item.id != group.id).toList();
+      return true;
+    } on LgtmGroupsException catch (failure) {
+      _error = failure.message;
+      return false;
+    } finally {
+      _busy = false;
       notifyListeners();
-      try {
-        await _repository.leaveGroup(
-          group: group,
-          member: _requireCurrentMember(),
-        );
-        _groups = _groups.where((item) => item.id != group.id).toList();
-        return true;
-      } on LgtmGroupsException catch (failure) {
-        _error = failure.message;
-        return false;
-      } finally {
-        _busy = false;
-        notifyListeners();
-      }
     }
+  }
 
   /// Puts [joined] where the member would expect to find it: at the top when
   /// they just joined, back where it was when they were already in it.

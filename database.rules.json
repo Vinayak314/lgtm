@@ -102,7 +102,7 @@
 
         "participants": {
           "$uid": {
-            ".write": "auth != null && newData.val() === true && (newData.parent().parent().child('hostId').val() === auth.uid || (auth.uid === $uid && root.child('groups').child(newData.parent().parent().child('groupId').val()).child('members').child(auth.uid).val() === true))",
+            ".write": "auth != null && newData.val() === true && newData.parent().parent().child('status').val() === 'lobby' && (newData.parent().parent().child('hostId').val() === auth.uid || (auth.uid === $uid && root.child('groups').child(newData.parent().parent().child('groupId').val()).child('members').child(auth.uid).val() === true))",
             ".validate": "newData.val() === true"
           }
         },

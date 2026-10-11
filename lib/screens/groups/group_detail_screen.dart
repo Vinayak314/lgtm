@@ -156,56 +156,56 @@ class GroupDetailScreen extends StatelessWidget {
                       padding: EdgeInsets.symmetric(horizontal: 24),
                       child: Divider(color: LgtmColors.divider),
                     ),
-                  const SizedBox(height: 24),
-                  LgtmSecondaryButton(
-                    onPressed: store.isBusy
-                        ? null
-                        : () async {
-                            final confirmed = await LgtmConfirmDialog.show(
-                              context,
-                              title: 'Leave ${group.name}?',
-                              message:
-                                  group.ownerId == store.currentMember?.id &&
-                                      group.members.length > 1
-                                  ? 'The owner cannot leave while other members remain.'
-                                  : 'You will need a new invite to join again.',
-                              confirmLabel: 'Leave',
-                              destructive: true,
-                            );
-                            if (!confirmed || !context.mounted) return;
-                            final left = await store.leaveGroup(group);
-                            if (!context.mounted) return;
-                            if (left) {
-                              Navigator.of(context).pushNamedAndRemoveUntil(
-                                LgtmRoutes.groups,
-                                (_) => false,
-                              );
-                            } else {
-                              _say(
-                                context,
-                                store.error ?? 'Could not leave the group.',
-                              );
-                            }
-                          },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.logout, color: LgtmColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Leave Group',
-                          style: LgtmSans.button.copyWith(
-                            color: LgtmColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   _SessionRow(session: group.sessions[i]),
                 ],
               ],
             ),
           ),
+        const SizedBox(height: 24),
+        LgtmSecondaryButton(
+          onPressed: store.isBusy
+              ? null
+              : () async {
+                  final confirmed = await LgtmConfirmDialog.show(
+                    context,
+                    title: 'Leave ${group.name}?',
+                    message:
+                        group.ownerId == store.currentMember?.id &&
+                            group.members.length > 1
+                        ? 'The owner cannot leave while other members remain.'
+                        : 'You will need a new invite to join again.',
+                    confirmLabel: 'Leave',
+                    destructive: true,
+                  );
+                  if (!confirmed || !context.mounted) return;
+                  final left = await store.leaveGroup(group);
+                  if (!context.mounted) return;
+                  if (left) {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      LgtmRoutes.groups,
+                      (_) => false,
+                    );
+                  } else {
+                    _say(
+                      context,
+                      store.error ?? 'Could not leave the group.',
+                    );
+                  }
+                },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.logout, color: LgtmColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Leave Group',
+                style: LgtmSans.button.copyWith(
+                  color: LgtmColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

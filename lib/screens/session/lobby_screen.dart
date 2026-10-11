@@ -57,6 +57,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
         if (state is SessionSwipingState) {
           return _transitionToSwipe(state);
         }
+        if (state is SessionWonState) {
+          return _transitionToSwipeForWinner(state);
+        }
         return Scaffold(
           backgroundColor: LgtmColors.bg,
           body: Column(
@@ -136,6 +139,22 @@ class _LobbyScreenState extends State<LobbyScreen> {
   }
 
   Widget _transitionToSwipe(SessionSwipingState state) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(
+        LgtmRoutes.sessionSwipe,
+        arguments: SwipeArgs(
+          groupId: state.session.groupId,
+          sessionId: state.session.id,
+          category: state.session.category.wire,
+          bloc: widget.args!.bloc,
+        ),
+      );
+    });
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+  }
+
+  Widget _transitionToSwipeForWinner(SessionWonState state) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(

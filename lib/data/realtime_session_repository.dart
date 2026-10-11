@@ -69,6 +69,17 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
   }
 
   @override
+  Future<LgtmSession?> fetchSession(String sessionId) async {
+    final snapshot = await _sessionsRef.child(sessionId).get();
+    final value = snapshot.value;
+    if (value == null || value is! Map) return null;
+    final map = Map<String, Object?>.from(
+      value.map((k, v) => MapEntry(k.toString(), v)),
+    );
+    return LgtmSession.fromJson(sessionId, map);
+  }
+
+  @override
   Stream<LgtmSession?> watchSession(String sessionId) {
     return _sessionsRef.child(sessionId).onValue.map((event) {
       final value = event.snapshot.value;
@@ -87,15 +98,44 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
     required String sessionId,
     required String userId,
   }) async {
-    final session = await _sessionsRef.child(sessionId).get();
-    if (session.value == null) {
+    final snapshot = await _sessionsRef.child(sessionId).get();
+    if (snapshot.value == null) {
       throw const LgtmSessionException('This session is no longer available.');
     }
-    final ref = _sessionsRef
-        .child(sessionId)
-        .child('participants')
-        .child(userId);
-    await ref.set(true);
+    final sessionMap = snapshot.value is Map
+        ? Map<String, Object?>.from(
+            (snapshot.value as Map).map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+        : const <String, Object?>{};
+
+    final status = SessionStatus.fromWire(sessionMap['status']);
+
+    if (status == SessionStatus.lobby) {
+      // Normal lobby join — add as participant.
+      final ref = _sessionsRef
+          .child(sessionId)
+          .child('participants')
+          .child(userId);
+      await ref.set(true);
+      return;
+    }
+
+    // Session already active or finished. If the user is already a
+    // participant this is a harmless rejoin — let the bloc handle it
+    // by subscribing to the stream. If they are NOT a participant,
+    // they missed the lobby window.
+    final participants = sessionMap['participants'];
+    final isParticipant = participants is Map &&
+        participants[userId] == true;
+
+    if (!isParticipant) {
+      throw const LgtmSessionException(
+        'This session has already started voting.',
+      );
+    }
+    // Already a participant of an active/finished session — no-op.
   }
 
   @override
@@ -133,9 +173,12 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
     required String sessionId,
     required LgtmSession session,
   }) async {
+    if (!session.allParticipantsFinished) return null;
+
     final sessionRef = _sessionsRef.child(sessionId);
 
-    // 1. Check for unanimous winner first
+    // All participants have voted. Prefer unanimous agreement, otherwise use
+    // the closest-match fallback.
     final unanimousCard = session.findUnanimousCard();
     if (unanimousCard != null) {
       return _tryDeclareTransaction(
@@ -145,16 +188,13 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
       );
     }
 
-    // 2. Check if all participants finished for fallback Closest Match
-    if (session.allParticipantsFinished) {
-      final closest = session.closestMatchCard();
-      if (closest != null) {
-        return _tryDeclareTransaction(
-          sessionRef,
-          cardId: closest.id,
-          type: WinnerType.closest,
-        );
-      }
+    final closest = session.closestMatchCard();
+    if (closest != null) {
+      return _tryDeclareTransaction(
+        sessionRef,
+        cardId: closest.id,
+        type: WinnerType.closest,
+      );
     }
 
     return null;
@@ -169,8 +209,14 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
       if (currentData == null) return Transaction.abort();
 
       final map = Map<String, dynamic>.from(currentData as Map);
-      if (map['winner'] != null) {
-        return Transaction.abort(); // Someone already declared winner
+      if (map['winner'] != null || map['status'] != SessionStatus.active.wire) {
+        return Transaction.abort();
+      }
+
+      final participants = _truthyKeys(map['participants']);
+      final finished = _truthyKeys(map['finished']);
+      if (participants.isEmpty || !finished.containsAll(participants)) {
+        return Transaction.abort();
       }
 
       map['winner'] = {'cardId': cardId, 'type': type.wire};
@@ -186,9 +232,7 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
         if (groupId != null && groupId.isNotEmpty) {
           final winnerName = _winnerName(snap.value as Map, cardId);
           final category = (snap.value as Map)['category']?.toString();
-          final date = _formatDate(
-            (snap.value as Map)['createdAt'],
-          );
+          final date = _formatDate((snap.value as Map)['createdAt']);
           final sessionId = sessionRef.key;
           if (sessionId == null) {
             throw const LgtmSessionException(
@@ -212,10 +256,24 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
     return null;
   }
 
+  Set<String> _truthyKeys(Object? value) {
+    if (value is! Map) return <String>{};
+    return {
+      for (final entry in value.entries)
+        if (entry.value == true) entry.key.toString(),
+    };
+  }
+
   String _winnerName(Map snapshot, String cardId) {
     final cards = snapshot['cards'];
     if (cards is List) {
       for (final card in cards) {
+        if (card is Map && card['id']?.toString() == cardId) {
+          return card['title']?.toString() ?? 'Selected option';
+        }
+      }
+    } else if (cards is Map) {
+      for (final card in cards.values) {
         if (card is Map && card['id']?.toString() == cardId) {
           return card['title']?.toString() ?? 'Selected option';
         }

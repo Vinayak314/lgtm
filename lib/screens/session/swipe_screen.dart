@@ -4,6 +4,7 @@ import '../../blocs/session/session_bloc.dart';
 import '../../blocs/session/session_event.dart';
 import '../../blocs/session/session_state.dart';
 import '../../app/router.dart';
+import '../../app/groups_store.dart';
 import '../../core/design_tokens.dart';
 import '../../models/session.dart';
 
@@ -41,7 +42,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   @override
   void dispose() {
-    widget.args?.bloc?.dispose();
+    // Do NOT dispose the bloc here. It is shared via route arguments and
+    // may be reused if the user navigates back and re-enters the session.
+    // The bloc will be collected when no widget holds a reference to it.
     super.dispose();
   }
 
@@ -166,13 +169,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
                     const SizedBox(height: 24),
                     FilledButton(
                       onPressed: () {
-                        final groupId = state.session.groupId;
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          LgtmRoutes.groupDetail,
-                          (route) =>
-                              route.settings.name == LgtmRoutes.groupDetail,
-                          arguments: GroupDetailArgs(groupId: groupId),
-                        );
+                        final store = LgtmGroupsScope.read(context);
+                        store.refresh().whenComplete(() {
+                          if (!mounted) return;
+                          Navigator.of(context).popUntil(
+                            (route) =>
+                                route.settings.name == LgtmRoutes.groupDetail,
+                          );
+                        });
                       },
                       child: const Text('Back to group'),
                     ),
