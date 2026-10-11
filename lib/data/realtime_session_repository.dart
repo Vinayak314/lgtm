@@ -9,12 +9,19 @@ import 'session_repository.dart';
 /// Live Firebase Realtime Database implementation of [LgtmSessionRepository].
 class RealtimeSessionRepository implements LgtmSessionRepository {
   RealtimeSessionRepository({FirebaseDatabase? database})
-      : _db = database ?? FirebaseDatabase.instance;
+    : _db = database ?? FirebaseDatabase.instance;
 
   final FirebaseDatabase _db;
 
   DatabaseReference get _sessionsRef => _db.ref('sessions');
   DatabaseReference get _groupsRef => _db.ref('groups');
+
+  @override
+  Future<String?> activeSessionId(String groupId) async {
+    final value =
+        (await _groupsRef.child('$groupId/activeSession').get()).value;
+    return value is String && value.isNotEmpty ? value : null;
+  }
 
   @override
   Future<LgtmSession> createSession({
@@ -24,6 +31,16 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
     required List<OptionCard> cards,
     double radiusMiles = 5.0,
   }) async {
+    final groupSnapshot = await _groupsRef.child(groupId).get();
+    final groupValue = groupSnapshot.value;
+    if (groupValue is Map &&
+        groupValue['activeSession'] is String &&
+        (groupValue['activeSession'] as String).isNotEmpty) {
+      throw const LgtmSessionException(
+        'This group already has an active session. Join its lobby instead.',
+      );
+    }
+
     final ref = _sessionsRef.push();
     final sessionId = ref.key!;
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -70,18 +87,21 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
     required String sessionId,
     required String userId,
   }) async {
-    final ref = _sessionsRef.child(sessionId).child('participants').child(userId);
+    final session = await _sessionsRef.child(sessionId).get();
+    if (session.value == null) {
+      throw const LgtmSessionException('This session is no longer available.');
+    }
+    final ref = _sessionsRef
+        .child(sessionId)
+        .child('participants')
+        .child(userId);
     await ref.set(true);
   }
 
   @override
-  Future<void> beginSwiping({
-    required String sessionId,
-  }) async {
+  Future<void> beginSwiping({required String sessionId}) async {
     final ref = _sessionsRef.child(sessionId);
-    await ref.update({
-      'status': SessionStatus.active.wire,
-    });
+    await ref.update({'status': SessionStatus.active.wire});
   }
 
   @override
@@ -153,26 +173,77 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
         return Transaction.abort(); // Someone already declared winner
       }
 
-      map['winner'] = {
-        'cardId': cardId,
-        'type': type.wire,
-      };
+      map['winner'] = {'cardId': cardId, 'type': type.wire};
       map['status'] = SessionStatus.finished.wire;
 
       return Transaction.success(map);
     });
 
     if (result.committed) {
-      // Clear activeSession banner link on group
       final snap = result.snapshot;
       if (snap.value is Map) {
         final groupId = (snap.value as Map)['groupId']?.toString();
         if (groupId != null && groupId.isNotEmpty) {
-          await _groupsRef.child(groupId).child('activeSession').remove();
+          final winnerName = _winnerName(snap.value as Map, cardId);
+          final category = (snap.value as Map)['category']?.toString();
+          final date = _formatDate(
+            (snap.value as Map)['createdAt'],
+          );
+          final sessionId = sessionRef.key;
+          if (sessionId == null) {
+            throw const LgtmSessionException(
+              'The completed session has no identifier.',
+            );
+          }
+          await _groupsRef.child(groupId).update({
+            'activeSession': null,
+            'sessions/$sessionId': {
+              'activity': category == SessionCategory.movie.wire
+                  ? 'Movies'
+                  : 'Food',
+              'winnerName': winnerName,
+              'date': date,
+            },
+          });
         }
       }
       return SessionWinner(cardId: cardId, type: type);
     }
     return null;
   }
+
+  String _winnerName(Map snapshot, String cardId) {
+    final cards = snapshot['cards'];
+    if (cards is List) {
+      for (final card in cards) {
+        if (card is Map && card['id']?.toString() == cardId) {
+          return card['title']?.toString() ?? 'Selected option';
+        }
+      }
+    }
+    return 'Selected option';
+  }
+
+  String _formatDate(Object? raw) {
+    final milliseconds = raw is num ? raw.toInt() : null;
+    if (milliseconds == null) return '';
+    final date = DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    return '${date.day.toString().padLeft(2, '0')} '
+        '${_months[date.month - 1]}';
+  }
+
+  static const _months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
 }

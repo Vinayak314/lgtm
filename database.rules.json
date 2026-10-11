@@ -58,6 +58,12 @@
         "kind": { ".write": "auth != null && newData.parent().child('ownerId').val() === auth.uid", ".validate": "newData.val() === 'home' || newData.val() === 'work'" },
         "createdAt": { ".write": "auth != null && newData.parent().child('ownerId').val() === auth.uid", ".validate": "newData.isNumber()" },
         "activeSession": { ".write": "auth != null && newData.parent().child('ownerId').val() === auth.uid", ".validate": "newData.val() === null || newData.isString()" },
+        "sessions": {
+          "$sid": {
+            ".write": "auth != null && newData.parent().parent().child('members').child(auth.uid).val() === true && root.child('sessions').child($sid).child('hostId').val() === auth.uid",
+            ".validate": "newData.hasChildren(['activity', 'winnerName', 'date'])"
+          }
+        },
 
         "ownerId": {
           ".write": "auth != null && data.parent().child('ownerId').val() === auth.uid",
@@ -107,6 +113,13 @@
               ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($sid).child('participants').child($uid).val() === true",
               ".validate": "newData.isBoolean()"
             }
+          }
+        },
+
+        "finished": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($sid).child('participants').child($uid).val() === true",
+            ".validate": "newData.val() === true"
           }
         }
       }

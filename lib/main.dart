@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'app/app.dart';
 import 'data/firebase_auth_repository.dart';
 import 'data/realtime_groups_repository.dart';
+import 'data/realtime_session_repository.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -23,6 +24,7 @@ Future<void> main() async {
     LgtmApp(
       authRepository: FirebaseAuthRepository(database: database),
       groupsRepository: RealtimeGroupsRepository(database: database),
+      sessionRepository: RealtimeSessionRepository(database: database),
     ),
   );
 }

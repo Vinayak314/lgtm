@@ -175,6 +175,26 @@ class LgtmGroupsStore extends ChangeNotifier {
     }
   }
 
+  Future<bool> leaveGroup(LgtmGroup group) async {
+      _busy = true;
+      _error = null;
+      notifyListeners();
+      try {
+        await _repository.leaveGroup(
+          group: group,
+          member: _requireCurrentMember(),
+        );
+        _groups = _groups.where((item) => item.id != group.id).toList();
+        return true;
+      } on LgtmGroupsException catch (failure) {
+        _error = failure.message;
+        return false;
+      } finally {
+        _busy = false;
+        notifyListeners();
+      }
+    }
+
   /// Puts [joined] where the member would expect to find it: at the top when
   /// they just joined, back where it was when they were already in it.
   ///

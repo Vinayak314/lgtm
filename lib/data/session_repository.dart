@@ -12,6 +12,9 @@ class LgtmSessionException implements Exception {
 
 /// Abstract contract for real-time session management.
 abstract class LgtmSessionRepository {
+  /// Returns the group's current active session, if one exists.
+  Future<String?> activeSessionId(String groupId) async => null;
+
   /// Creates a new session in Firebase Realtime Database.
   ///
   /// Host fetches up to 15 options using TMDB or Places API and stores them in the session.

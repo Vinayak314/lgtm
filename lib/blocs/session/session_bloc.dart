@@ -15,10 +15,10 @@ class SessionBloc {
     required String currentUserId,
     MovieApiService? movieApi,
     PlacesApiService? placesApi,
-  })  : _repository = repository,
-        _currentUserId = currentUserId,
-        _movieApi = movieApi ?? MovieApiService(),
-        _placesApi = placesApi ?? PlacesApiService() {
+  }) : _repository = repository,
+       _currentUserId = currentUserId,
+       _movieApi = movieApi ?? MovieApiService(),
+       _placesApi = placesApi ?? PlacesApiService() {
     _eventController.stream.listen(_handleEvent);
   }
 
@@ -79,11 +79,17 @@ class SessionBloc {
 
       final List<OptionCard> cards;
       if (category == SessionCategory.movie) {
-        cards = await _movieApi.fetchMovieDeck(limit: 15);
+        cards = await _movieApi.fetchMovieDeck(limit: 6);
       } else {
         cards = await _placesApi.fetchPlacesDeck(
           radiusMiles: event.radiusMiles,
-          limit: 15,
+          limit: 5,
+        );
+      }
+
+      if (cards.length < 3) {
+        throw const LgtmSessionException(
+          'There are not enough options to start a session.',
         );
       }
 
@@ -96,8 +102,8 @@ class SessionBloc {
       );
 
       _subscribeToSession(session.id);
-    } catch (e) {
-      _emit(SessionErrorState('Failed to create session: $e'));
+    } catch (error) {
+      _emit(SessionErrorState('Failed to create session: $error'));
     }
   }
 
@@ -142,11 +148,13 @@ class SessionBloc {
             userId: _currentUserId,
           );
         } else {
-          _emit(SessionSwipingState(
-            session: currentSwiping.session,
-            currentIndex: _localIndex,
-            cards: currentSwiping.cards,
-          ));
+          _emit(
+            SessionSwipingState(
+              session: currentSwiping.session,
+              currentIndex: _localIndex,
+              cards: currentSwiping.cards,
+            ),
+          );
         }
       }
     } catch (e) {
@@ -167,44 +175,72 @@ class SessionBloc {
         (c) => c.id == session.winner!.cardId,
         orElse: () => session.cards.first,
       );
-      _emit(SessionWonState(
-        session: session,
-        winnerCard: winnerCard,
-        winnerType: session.winner!.type,
-      ));
+      _emit(
+        SessionWonState(
+          session: session,
+          winnerCard: winnerCard,
+          winnerType: session.winner!.type,
+        ),
+      );
       return;
     }
 
-    // Try detecting winner if active
-    if (session.status == SessionStatus.active) {
-      await _repository.checkAndDeclareWinner(
+    // Only the host may finalize the session under the Firebase rules. The
+    // other participants receive the finished snapshot through the stream.
+    if (session.status == SessionStatus.active &&
+        session.hostId == _currentUserId) {
+      final declaredWinner = await _repository.checkAndDeclareWinner(
         sessionId: session.id,
         session: session,
       );
+      if (declaredWinner != null) {
+        final finishedSession = session.copyWith(
+          status: SessionStatus.finished,
+          winner: declaredWinner,
+        );
+        final winnerCard = finishedSession.cards.firstWhere(
+          (c) => c.id == declaredWinner.cardId,
+          orElse: () => finishedSession.cards.first,
+        );
+        _emit(
+          SessionWonState(
+            session: finishedSession,
+            winnerCard: winnerCard,
+            winnerType: declaredWinner.type,
+          ),
+        );
+        return;
+      }
     }
 
     switch (session.status) {
       case SessionStatus.lobby:
-        _emit(SessionLobbyState(
-          session: session,
-          isHost: session.hostId == _currentUserId,
-        ));
+        _emit(
+          SessionLobbyState(
+            session: session,
+            isHost: session.hostId == _currentUserId,
+          ),
+        );
         break;
 
       case SessionStatus.active:
         if (session.finishedIds.contains(_currentUserId) ||
             _localIndex >= session.cards.length) {
-          _emit(SessionWaitingState(
-            session: session,
-            finishedCount: session.finishedIds.length,
-            totalParticipants: session.participantIds.length,
-          ));
+          _emit(
+            SessionWaitingState(
+              session: session,
+              finishedCount: session.finishedIds.length,
+              totalParticipants: session.participantIds.length,
+            ),
+          );
         } else {
-          _emit(SessionSwipingState(
-            session: session,
-            currentIndex: _localIndex,
-            cards: session.cards,
-          ));
+          _emit(
+            SessionSwipingState(
+              session: session,
+              currentIndex: _localIndex,
+              cards: session.cards,
+            ),
+          );
         }
         break;
 
@@ -214,11 +250,13 @@ class SessionBloc {
             (c) => c.id == session.winner!.cardId,
             orElse: () => session.cards.first,
           );
-          _emit(SessionWonState(
-            session: session,
-            winnerCard: winnerCard,
-            winnerType: session.winner!.type,
-          ));
+          _emit(
+            SessionWonState(
+              session: session,
+              winnerCard: winnerCard,
+              winnerType: session.winner!.type,
+            ),
+          );
         }
         break;
     }
@@ -226,14 +264,16 @@ class SessionBloc {
 
   void _subscribeToSession(String sessionId) {
     _sessionSubscription?.cancel();
-    _sessionSubscription = _repository.watchSession(sessionId).listen(
-      (session) {
-        add(SessionUpdatedEvent(session));
-      },
-      onError: (error) {
-        _emit(SessionErrorState('Realtime sync error: $error'));
-      },
-    );
+    _sessionSubscription = _repository
+        .watchSession(sessionId)
+        .listen(
+          (session) {
+            add(SessionUpdatedEvent(session));
+          },
+          onError: (error) {
+            _emit(SessionErrorState('Realtime sync error: $error'));
+          },
+        );
   }
 
   void dispose() {

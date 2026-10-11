@@ -51,10 +51,7 @@ class SessionWinner {
     type: WinnerType.fromWire(json['type']),
   );
 
-  Map<String, Object?> toJson() => {
-    'cardId': cardId,
-    'type': type.wire,
-  };
+  Map<String, Object?> toJson() => {'cardId': cardId, 'type': type.wire};
 }
 
 /// A live or completed session, stored at `sessions/{sid}`.
@@ -162,8 +159,7 @@ class LgtmSession {
     for (final entry in votesRaw.entries) {
       final inner = jsonAsMap(entry.value);
       votes[entry.key] = {
-        for (final voter in inner.entries)
-          voter.key: voter.value == true,
+        for (final voter in inner.entries) voter.key: voter.value == true,
       };
     }
 
@@ -204,16 +200,19 @@ class LgtmSession {
     if (createdAt != null) 'createdAt': createdAt,
     'cards': [for (final card in cards) card.toJson()],
     'participants': {for (final uid in participantIds) uid: true},
-    'votes': {
-      for (final entry in votes.entries)
-        entry.key: entry.value,
-    },
+    'votes': {for (final entry in votes.entries) entry.key: entry.value},
     'finished': {for (final uid in finishedIds) uid: true},
     if (winner != null) 'winner': winner!.toJson(),
   };
 
   LgtmSession copyWith({
+    String? groupId,
+    String? hostId,
+    SessionCategory? category,
+    double? radius,
+    String? genre,
     SessionStatus? status,
+    int? createdAt,
     List<OptionCard>? cards,
     Set<String>? participantIds,
     Map<String, Map<String, bool>>? votes,
@@ -221,12 +220,17 @@ class LgtmSession {
     SessionWinner? winner,
   }) => LgtmSession(
     id: id,
-    groupId: groupId,
-    hostId: hostId,
-    category: category,
-    radius: radius,
-    genre: genre,
+    groupId: groupId ?? this.groupId,
+    hostId: hostId ?? this.hostId,
+    category: category ?? this.category,
+    radius: radius ?? this.radius,
+    genre: genre ?? this.genre,
     status: status ?? this.status,
+    createdAt: createdAt ?? this.createdAt,
+    cards: cards ?? this.cards,
+    participantIds: participantIds ?? this.participantIds,
+    votes: votes ?? this.votes,
+    finishedIds: finishedIds ?? this.finishedIds,
     winner: winner ?? this.winner,
   );
 
@@ -267,8 +271,7 @@ OptionCard closestMatch(
   List<OptionCard> cards,
   Map<String, Map<String, bool>> votes,
 ) {
-  int yesCount(OptionCard c) =>
-      votes[c.id]?.values.where((v) => v).length ?? 0;
+  int yesCount(OptionCard c) => votes[c.id]?.values.where((v) => v).length ?? 0;
 
   return cards.reduce((a, b) {
     final diff = yesCount(a) - yesCount(b);

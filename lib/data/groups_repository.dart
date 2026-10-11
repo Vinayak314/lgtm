@@ -84,4 +84,13 @@ abstract class LgtmGroupsRepository {
     required String code,
     required LgtmMember member,
   });
+
+  /// Removes [member] from the group and cleans both membership indexes.
+  ///
+  /// If the owner leaves, ownership is transferred to the first remaining
+  /// member. A group with no remaining members is deleted.
+  Future<void> leaveGroup({
+    required LgtmGroup group,
+    required LgtmMember member,
+  }) => throw UnimplementedError('This repository does not support leaving.');
 }

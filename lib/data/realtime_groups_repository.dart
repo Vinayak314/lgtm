@@ -250,6 +250,34 @@ class RealtimeGroupsRepository implements LgtmGroupsRepository {
     return _groupFrom(id, raw, await _readProfiles());
   }
 
+  @override
+  Future<void> leaveGroup({
+    required LgtmGroup group,
+    required LgtmMember member,
+  }) async {
+    try {
+      final groupRef = _database.ref('groups/${group.id}');
+      final remaining = group.memberIds.where((id) => id != member.id).toList();
+      if (group.ownerId == member.id && remaining.isNotEmpty) {
+        throw const LgtmGroupsException(
+          'The group owner must transfer ownership before leaving.',
+        );
+      }
+      if (remaining.isEmpty) {
+        await groupRef.remove();
+        await _database.ref('inviteCodes/${group.inviteCode}').remove();
+      } else {
+        await groupRef.child('members/${member.id}').remove();
+      }
+      await _database.ref('userGroups/${member.id}/${group.id}').remove();
+    } catch (failure) {
+      throw LgtmGroupsException.forFailure(
+        failure,
+        what: 'leave the group',
+      );
+    }
+  }
+
   /// Best effort cleanup: swallows the failure and moves on, because the caller
   /// is already on its way to explaining something the member can act on, and
   /// a leftover row is a stale group card rather than a broken one.
@@ -269,6 +297,7 @@ class RealtimeGroupsRepository implements LgtmGroupsRepository {
   }) => LgtmGroup.fromJson(
     id,
     raw,
+    sessions: LgtmGroupSession.listFromJson(jsonAsMap(raw['sessions'])),
     members: [
       for (final entry in (members ?? jsonAsMap(raw['members'])).entries)
         if (entry.value == true)

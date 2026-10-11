@@ -20,7 +20,6 @@ class LgtmBottomNav extends StatelessWidget {
 
   static const _items = <(LgtmNavTab, String, IconData)>[
     (LgtmNavTab.groups, 'Groups', Icons.groups),
-    (LgtmNavTab.swipe, 'Swipe', Icons.style),
     (LgtmNavTab.matches, 'Matches', Icons.star),
     (LgtmNavTab.profile, 'Profile', Icons.person),
   ];
