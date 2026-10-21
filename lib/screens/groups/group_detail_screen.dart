@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../app/groups_store.dart';
 import '../../app/router.dart';
@@ -10,6 +11,7 @@ import '../../widgets/lgtm_card.dart';
 import '../../widgets/lgtm_pill.dart';
 import '../../widgets/lgtm_top_bar.dart';
 import '../../widgets/states/lgtm_empty_state.dart';
+import '../../widgets/states/lgtm_confirm_dialog.dart';
 import '../session/session_setup_screen.dart';
 
 /// Group Detail: the invite link to share, who is in the group, what they
@@ -75,6 +77,9 @@ class GroupDetailScreen extends StatelessWidget {
         ],
       ),
       bottomNavigationBar: _StartSessionBar(
+        hasActiveSession: group.hasActiveSession,
+        canStart:
+            group.hasActiveSession || group.ownerId == store.currentMember?.id,
         onPressed: () => Navigator.of(context).pushNamed(
           LgtmRoutes.sessionSetup,
           arguments: SessionSetupArgs(groupId: group.id),
@@ -101,7 +106,10 @@ class GroupDetailScreen extends StatelessWidget {
             if (!context.mounted) return;
             _say(context, 'Invite link copied.');
           },
-          onShare: () => _say(context, 'Sharing is not connected yet.'),
+          onShare: () => Share.share(
+            'Join ${group.name} on LGTM: ${group.inviteLink}',
+            subject: 'Join ${group.name} on LGTM',
+          ),
         ),
         const SizedBox(height: 24),
         Semantics(header: true, child: Text('MEMBERS', style: labelStyle)),
@@ -153,6 +161,51 @@ class GroupDetailScreen extends StatelessWidget {
               ],
             ),
           ),
+        const SizedBox(height: 24),
+        LgtmSecondaryButton(
+          onPressed: store.isBusy
+              ? null
+              : () async {
+                  final confirmed = await LgtmConfirmDialog.show(
+                    context,
+                    title: 'Leave ${group.name}?',
+                    message:
+                        group.ownerId == store.currentMember?.id &&
+                            group.members.length > 1
+                        ? 'The owner cannot leave while other members remain.'
+                        : 'You will need a new invite to join again.',
+                    confirmLabel: 'Leave',
+                    destructive: true,
+                  );
+                  if (!confirmed || !context.mounted) return;
+                  final left = await store.leaveGroup(group);
+                  if (!context.mounted) return;
+                  if (left) {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      LgtmRoutes.groups,
+                      (_) => false,
+                    );
+                  } else {
+                    _say(
+                      context,
+                      store.error ?? 'Could not leave the group.',
+                    );
+                  }
+                },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.logout, color: LgtmColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Leave Group',
+                style: LgtmSans.button.copyWith(
+                  color: LgtmColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -343,9 +396,15 @@ class _SessionRow extends StatelessWidget {
 
 /// The Start Session CTA, pinned above the home indicator.
 class _StartSessionBar extends StatelessWidget {
-  const _StartSessionBar({required this.onPressed});
+  const _StartSessionBar({
+    required this.onPressed,
+    required this.hasActiveSession,
+    required this.canStart,
+  });
 
   final VoidCallback onPressed;
+  final bool hasActiveSession;
+  final bool canStart;
 
   @override
   Widget build(BuildContext context) {
@@ -360,11 +419,15 @@ class _StartSessionBar extends StatelessWidget {
           16 + bottomInset,
         ),
         child: LgtmPrimaryButton(
-          label: 'Start Session',
-          icon: Icons.add_circle_outline,
+          label: hasActiveSession
+              ? 'Join Session'
+              : canStart
+              ? 'Start Session'
+              : 'Waiting for owner',
+          icon: hasActiveSession ? Icons.login : Icons.add_circle_outline,
           height: 56,
           shadows: LgtmShadow.primarySoft,
-          onPressed: onPressed,
+          onPressed: canStart ? onPressed : null,
         ),
       ),
     );

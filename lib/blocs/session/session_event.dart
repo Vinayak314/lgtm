@@ -48,3 +48,11 @@ class SessionUpdatedEvent extends SessionEvent {
   const SessionUpdatedEvent(this.session);
   final LgtmSession? session;
 }
+
+/// User is rejoining a session that is already active or finished.
+/// The bloc should subscribe to the session stream and recover local state
+/// from Firebase rather than trying to join the lobby.
+class RejoinSessionEvent extends SessionEvent {
+  const RejoinSessionEvent({required this.sessionId});
+  final String sessionId;
+}

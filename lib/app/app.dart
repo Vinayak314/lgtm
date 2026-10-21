@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../core/design_tokens.dart';
+import '../data/realtime_session_repository.dart';
+import '../data/session_repository.dart';
 import '../widgets/design_canvas.dart';
 import 'groups_store.dart';
 import 'router.dart';
@@ -16,6 +19,7 @@ class LgtmApp extends StatefulWidget {
     this.session,
     this.authRepository,
     this.groupsRepository,
+    this.sessionRepository,
   });
 
   /// Overridden by tests to open straight onto a screen.
@@ -32,6 +36,7 @@ class LgtmApp extends StatefulWidget {
 
   /// Where groups are stored.
   final LgtmGroupsRepository? groupsRepository;
+  final LgtmSessionRepository? sessionRepository;
 
   @override
   State<LgtmApp> createState() => _LgtmAppState();
@@ -51,6 +56,9 @@ class _LgtmAppState extends State<LgtmApp> {
     repository: widget.groupsRepository ??
         (throw StateError('LgtmApp requires a groups repository.')),
   );
+
+  late final LgtmSessionRepository _sessionRepository =
+      widget.sessionRepository ?? RealtimeSessionRepository();
 
   @override
   void initState() {
@@ -99,9 +107,12 @@ class _LgtmAppState extends State<LgtmApp> {
           store: _groups,
           child: LgtmSessionScope(
             session: _session,
-            child: DesignCanvas(
-              backgroundColor: LgtmColors.bg,
-              child: child ?? const SizedBox.shrink(),
+            child: Provider<LgtmSessionRepository>.value(
+              value: _sessionRepository,
+              child: DesignCanvas(
+                backgroundColor: LgtmColors.bg,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         );

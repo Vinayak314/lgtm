@@ -3,10 +3,18 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/router.dart';
+import '../../app/session.dart';
+import '../../app/groups_store.dart';
 import '../../core/design_tokens.dart';
+import '../../data/session_repository.dart';
+import 'package:provider/provider.dart';
+import '../../blocs/session/session_bloc.dart';
+import '../../blocs/session/session_event.dart';
+import '../../models/session.dart';
 import '../../widgets/lgtm_buttons.dart';
 import '../../widgets/lgtm_top_bar.dart';
 import 'lobby_screen.dart';
+import 'swipe_screen.dart';
 
 /// Arguments for the session setup screen.
 class SessionSetupArgs {
@@ -37,19 +45,105 @@ class SessionSetupScreen extends StatefulWidget {
 
 class _SessionSetupScreenState extends State<SessionSetupScreen> {
   _Category _selected = _Category.food;
+  bool _checkingActiveSession = true;
+  bool _redirectedToActiveSession = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _joinActiveSessionIfPresent();
+    });
+  }
+
+  Future<void> _joinActiveSessionIfPresent() async {
+    final args = widget.args;
+    final user = LgtmSessionScope.read(context).user;
+    if (args == null || user == null) {
+      if (mounted) setState(() => _checkingActiveSession = false);
+      return;
+    }
+
+    final repository = context.read<LgtmSessionRepository>();
+    try {
+      final activeSessionId = await repository.activeSessionId(args.groupId);
+      if (!mounted) return;
+
+      if (activeSessionId == null) {
+        setState(() => _checkingActiveSession = false);
+        return;
+      }
+
+      // Fetch current session state to decide the right screen.
+      final session = await repository.fetchSession(activeSessionId);
+      if (!mounted) return;
+
+      if (session == null) {
+        // Session was deleted or doesn't exist. Clear the stale pointer.
+        setState(() => _checkingActiveSession = false);
+        return;
+      }
+
+      final bloc = SessionBloc(
+        repository: repository,
+        currentUserId: user.uid,
+      );
+
+      setState(() => _redirectedToActiveSession = true);
+
+      switch (session.status) {
+        case SessionStatus.lobby:
+          // Lobby is still open — join normally.
+          bloc.add(JoinLobbyEvent(sessionId: activeSessionId));
+          await Navigator.of(context).pushReplacementNamed(
+            LgtmRoutes.sessionLobby,
+            arguments: LobbyArgs(
+              groupId: args.groupId,
+              sessionId: activeSessionId,
+              bloc: bloc,
+            ),
+          );
+          break;
+
+        case SessionStatus.active:
+        case SessionStatus.finished:
+          // Session already started or finished. Rejoin without writing
+          // to participants — just subscribe to the stream.
+          bloc.add(RejoinSessionEvent(sessionId: activeSessionId));
+          await Navigator.of(context).pushReplacementNamed(
+            LgtmRoutes.sessionSwipe,
+            arguments: SwipeArgs(
+              groupId: args.groupId,
+              sessionId: activeSessionId,
+              category: session.category.wire,
+              bloc: bloc,
+            ),
+          );
+          break;
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _checkingActiveSession = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not join session: $error')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingActiveSession || _redirectedToActiveSession) {
+      return const Scaffold(
+        backgroundColor: LgtmColors.bg,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       backgroundColor: LgtmColors.bg,
       body: Stack(
         children: [
           // Decorative blob (design.md §0: small, x 0-100, y 64-100).
-          Positioned(
-            left: -30,
-            top: 56,
-            child: _Blob(width: 130, height: 55),
-          ),
+          Positioned(left: -30, top: 56, child: _Blob(width: 130, height: 55)),
           Column(
             children: [
               LgtmTopBar(
@@ -113,20 +207,47 @@ class _SessionSetupScreenState extends State<SessionSetupScreen> {
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
               ),
-              onPressed: widget.args == null
-                  ? null
-                  : () {
-                Navigator.of(context).pushNamed(
-                  LgtmRoutes.sessionLobby,
-                  arguments: LobbyArgs(
-                    groupId: widget.args!.groupId,
-                    category: _selected.name,
-                  ),
-                );
-              },
+              onPressed: widget.args == null ? null : _startSession,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _startSession() async {
+    final args = widget.args;
+    final user = LgtmSessionScope.read(context).user;
+    if (args == null || user == null) return;
+
+    final group = LgtmGroupsScope.read(context).groupById(args.groupId);
+    final repository = context.read<LgtmSessionRepository>();
+    final bloc = SessionBloc(
+      repository: repository,
+      currentUserId: user.uid,
+    );
+    if (group == null || group.ownerId != user.uid) {
+      bloc.dispose();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only the group owner can start a new session.'),
+        ),
+      );
+      return;
+    }
+    bloc.add(
+      SessionStartedEvent(
+        groupId: args.groupId,
+        categoryName: _selected.name,
+      ),
+    );
+    Navigator.of(context).pushNamed(
+      LgtmRoutes.sessionLobby,
+      arguments: LobbyArgs(
+        groupId: args.groupId,
+        category: _selected.name,
+        sessionId: '',
+        bloc: bloc,
       ),
     );
   }
@@ -185,9 +306,7 @@ class _Chip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = isSelected ? LgtmColors.primary : LgtmColors.inkMuted;
     final fill = isSelected ? LgtmColors.primarySoft : LgtmColors.surface;
-    final border = isSelected
-        ? LgtmColors.primary
-        : LgtmColors.chipBorder;
+    final border = isSelected ? LgtmColors.primary : LgtmColors.chipBorder;
     final shadows = isSelected ? LgtmShadow.chipHard : null;
 
     return Semantics(
@@ -202,10 +321,7 @@ class _Chip extends StatelessWidget {
           decoration: BoxDecoration(
             color: fill,
             borderRadius: const BorderRadius.all(Radius.circular(10)),
-            border: Border.all(
-              color: border,
-              width: isSelected ? 2 : 1,
-            ),
+            border: Border.all(color: border, width: isSelected ? 2 : 1),
             boxShadow: shadows,
           ),
           child: Row(

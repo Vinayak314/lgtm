@@ -530,6 +530,43 @@ await it('the winner is written once, and only by the host', async () => {
   );
 });
 
+await it('the host ends a session in one update, not by rewriting the session', async () => {
+  await seed(async (database) => {
+    await database.ref('groups/g1').set({ ...group('ABC12', 'host'), activeSession: 's1' });
+    await database.ref('sessions/s1').set({ ...session('g1', 'host'), status: 'active' });
+  });
+
+  // What checkAndDeclareWinner writes: the winner, the status and the group's
+  // bookkeeping together, each path checked against its own rule.
+  const ending = {
+    'sessions/s1/winner': { cardId: 'c3', type: 'unanimous' },
+    'sessions/s1/status': 'finished',
+    'groups/g1/activeSession': null,
+    'groups/g1/sessions/s1': { activity: 'Food', winnerName: 'Taco Bell', date: '14 Nov' },
+  };
+
+  // Rewriting the whole session node is refused, because that rule only allows
+  // creation. This was the write that left sessions stuck on "active".
+  const host = as('host');
+  const current = (await host.database.ref('sessions/s1').get()).val();
+  await assertFails(
+    host.database
+      .ref('sessions/s1')
+      .set({ ...current, winner: ending['sessions/s1/winner'], status: 'finished' }),
+  );
+
+  const mate = await signUp('Mate');
+  await mate.database.ref(`groups/g1/members/${mate.uid}`).set(true);
+  await assertFails(mate.database.ref().update(ending));
+
+  await assertSucceeds(host.database.ref().update(ending));
+  const pointer = await host.database.ref('groups/g1/activeSession').get();
+  if (pointer.val() !== null) throw new Error('the active session was not cleared');
+
+  // A second declaration cannot overwrite the first.
+  await assertFails(host.database.ref().update(ending));
+});
+
 await it('the host drives the session, and the participants cannot', async () => {
   await seed(async (database) => {
     await database.ref('groups/g1').set(group('ABC12', 'host'));
@@ -537,17 +574,19 @@ await it('the host drives the session, and the participants cannot', async () =>
   });
 
   const host = as('host');
-  await assertSucceeds(host.database.ref('sessions/s1/status').set('active'));
-  await assertSucceeds(
-    host.database.ref('sessions/s1/cards').set([{ id: 'c1', title: 'Taco Bell' }]),
-  );
-  await assertSucceeds(host.database.ref('sessions/s1/radius').set(10000));
 
+  // The member joins while the lobby is open: Begin locks the participants.
   const mate = await signUp('Mate');
   await mate.database.ref(`groups/g1/members/${mate.uid}`).set(true);
   await assertSucceeds(
     mate.database.ref(`sessions/s1/participants/${mate.uid}`).set(true),
   );
+
+  await assertSucceeds(host.database.ref('sessions/s1/status').set('active'));
+  await assertSucceeds(
+    host.database.ref('sessions/s1/cards').set([{ id: 'c1', title: 'Taco Bell' }]),
+  );
+  await assertSucceeds(host.database.ref('sessions/s1/radius').set(10000));
 
   await assertFails(mate.database.ref('sessions/s1/status').set('finished'));
   await assertFails(

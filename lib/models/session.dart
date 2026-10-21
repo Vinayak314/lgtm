@@ -51,10 +51,7 @@ class SessionWinner {
     type: WinnerType.fromWire(json['type']),
   );
 
-  Map<String, Object?> toJson() => {
-    'cardId': cardId,
-    'type': type.wire,
-  };
+  Map<String, Object?> toJson() => {'cardId': cardId, 'type': type.wire};
 }
 
 /// A live or completed session, stored at `sessions/{sid}`.
@@ -162,8 +159,7 @@ class LgtmSession {
     for (final entry in votesRaw.entries) {
       final inner = jsonAsMap(entry.value);
       votes[entry.key] = {
-        for (final voter in inner.entries)
-          voter.key: voter.value == true,
+        for (final voter in inner.entries) voter.key: voter.value == true,
       };
     }
 
@@ -204,16 +200,19 @@ class LgtmSession {
     if (createdAt != null) 'createdAt': createdAt,
     'cards': [for (final card in cards) card.toJson()],
     'participants': {for (final uid in participantIds) uid: true},
-    'votes': {
-      for (final entry in votes.entries)
-        entry.key: entry.value,
-    },
+    'votes': {for (final entry in votes.entries) entry.key: entry.value},
     'finished': {for (final uid in finishedIds) uid: true},
     if (winner != null) 'winner': winner!.toJson(),
   };
 
   LgtmSession copyWith({
+    String? groupId,
+    String? hostId,
+    SessionCategory? category,
+    double? radius,
+    String? genre,
     SessionStatus? status,
+    int? createdAt,
     List<OptionCard>? cards,
     Set<String>? participantIds,
     Map<String, Map<String, bool>>? votes,
@@ -221,23 +220,75 @@ class LgtmSession {
     SessionWinner? winner,
   }) => LgtmSession(
     id: id,
-    groupId: groupId,
-    hostId: hostId,
-    category: category,
-    radius: radius,
-    genre: genre,
+    groupId: groupId ?? this.groupId,
+    hostId: hostId ?? this.hostId,
+    category: category ?? this.category,
+    radius: radius ?? this.radius,
+    genre: genre ?? this.genre,
     status: status ?? this.status,
+    createdAt: createdAt ?? this.createdAt,
+    cards: cards ?? this.cards,
+    participantIds: participantIds ?? this.participantIds,
+    votes: votes ?? this.votes,
+    finishedIds: finishedIds ?? this.finishedIds,
     winner: winner ?? this.winner,
   );
 
   bool get allParticipantsFinished =>
-      finishedIds.length >= participantIds.length && participantIds.isNotEmpty;
+      participantIds.isNotEmpty && finishedIds.containsAll(participantIds);
 
   String? findUnanimousCard() =>
       findUnanimousCardHelper(votes, participantIds.length);
 
   OptionCard? closestMatchCard() =>
       cards.isEmpty ? null : closestMatch(cards, votes);
+
+  /// The winner the votes have already settled on, or null while swiping
+  /// should go on. A card every participant said Yes to wins straight away;
+  /// otherwise the closest match wins once everyone has finished the deck.
+  SessionWinner? get decidedWinner {
+    if (participantIds.isEmpty) return null;
+    final unanimous = findUnanimousCard();
+    if (unanimous != null) {
+      return SessionWinner(cardId: unanimous, type: WinnerType.unanimous);
+    }
+    if (!allParticipantsFinished) return null;
+    final closest = closestMatchCard();
+    return closest == null
+        ? null
+        : SessionWinner(cardId: closest.id, type: WinnerType.closest);
+  }
+
+  /// Index of the first card [uid] has not voted on, or -1 once they have
+  /// voted on the whole deck. Deriving progress from the stored votes keeps
+  /// every device, and every rejoin, on the same card.
+  int nextCardIndexFor(String uid) =>
+      cards.indexWhere((card) => !(votes[card.id]?.containsKey(uid) ?? false));
+
+  /// Every card with its live tally, best first, for the leaderboard members
+  /// see while they wait. Once the votes have decided a winner, that card is
+  /// always the top row, so the leaderboard shows what the host will confirm.
+  List<OptionStanding> get standings {
+    final ranked = [
+      for (final (index, card) in cards.indexed)
+        OptionStanding(
+          card: card,
+          deckIndex: index,
+          yesCount: votes[card.id]?.values.where((v) => v).length ?? 0,
+          votedCount: votes[card.id]?.length ?? 0,
+        ),
+    ];
+    // Once the votes have decided, rank as the host will and pin the winner to
+    // the top. With several unanimous cards (piled up while the host was
+    // away) the pick can differ from the rating tie-break.
+    final decided = decidedWinner;
+    ranked.sort(decided != null ? compareFinalStandings : compareLiveStandings);
+    if (decided != null) {
+      final at = ranked.indexWhere((s) => s.card.id == decided.cardId);
+      if (at > 0) ranked.insert(0, ranked.removeAt(at));
+    }
+    return ranked;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -267,8 +318,7 @@ OptionCard closestMatch(
   List<OptionCard> cards,
   Map<String, Map<String, bool>> votes,
 ) {
-  int yesCount(OptionCard c) =>
-      votes[c.id]?.values.where((v) => v).length ?? 0;
+  int yesCount(OptionCard c) => votes[c.id]?.values.where((v) => v).length ?? 0;
 
   return cards.reduce((a, b) {
     final diff = yesCount(a) - yesCount(b);
@@ -277,6 +327,49 @@ OptionCard closestMatch(
     return a.rating >= b.rating ? a : b;
   });
 }
+
+/// One option's live tally on the waiting screen's leaderboard.
+class OptionStanding {
+  const OptionStanding({
+    required this.card,
+    required this.deckIndex,
+    required this.yesCount,
+    required this.votedCount,
+  });
+
+  final OptionCard card;
+
+  /// Position in the deck, the last tie-break.
+  final int deckIndex;
+
+  /// Participants who swiped Yes.
+  final int yesCount;
+
+  /// Participants who have voted on this card at all, Yes or No.
+  final int votedCount;
+}
+
+/// Leaderboard order once everyone has finished: most Yes votes, then the
+/// higher rating, then the earlier card. This matches [closestMatch], so the
+/// top standing is always the card the host declares.
+int compareFinalStandings(OptionStanding a, OptionStanding b) {
+  final byYes = b.yesCount.compareTo(a.yesCount);
+  if (byYes != 0) return byYes;
+  final byRating = b.card.rating.compareTo(a.card.rating);
+  if (byRating != 0) return byRating;
+  return a.deckIndex.compareTo(b.deckIndex);
+}
+
+/// Leaderboard order while the votes have not decided a winner yet. Once they
+/// have, [LgtmSession.standings] switches to [compareFinalStandings].
+///
+/// TODO: pick the in-progress ranking. Raw Yes counts (the default, same as
+/// the final order) favour cards early in the deck, because slower swipers
+/// have not reached the later ones yet. The share of Yes among those who
+/// have voted on a card ([OptionStanding.votedCount]) is fairer mid-swipe,
+/// but the order shuffles more as the last votes come in.
+int compareLiveStandings(OptionStanding a, OptionStanding b) =>
+    compareFinalStandings(a, b);
 
 // ---------------------------------------------------------------------------
 // Tiny helpers

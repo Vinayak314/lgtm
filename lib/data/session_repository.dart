@@ -12,6 +12,9 @@ class LgtmSessionException implements Exception {
 
 /// Abstract contract for real-time session management.
 abstract class LgtmSessionRepository {
+  /// Returns the group's current active session, if one exists.
+  Future<String?> activeSessionId(String groupId) async => null;
+
   /// Creates a new session in Firebase Realtime Database.
   ///
   /// Host fetches up to 15 options using TMDB or Places API and stores them in the session.
@@ -23,19 +26,17 @@ abstract class LgtmSessionRepository {
     double radiusMiles = 5.0,
   });
 
+  /// One-shot read of a session snapshot.
+  Future<LgtmSession?> fetchSession(String sessionId);
+
   /// Real-time stream of session updates (lobby members, status, cards, votes, winner).
   Stream<LgtmSession?> watchSession(String sessionId);
 
   /// Allows a member to join the lobby before swiping begins.
-  Future<void> joinLobby({
-    required String sessionId,
-    required String userId,
-  });
+  Future<void> joinLobby({required String sessionId, required String userId});
 
   /// Host locks active participants and starts swiping (`status = active`).
-  Future<void> beginSwiping({
-    required String sessionId,
-  });
+  Future<void> beginSwiping({required String sessionId});
 
   /// Records a user's Yes/No swipe on a specific card.
   Future<void> submitVote({
@@ -51,7 +52,10 @@ abstract class LgtmSessionRepository {
     required String userId,
   });
 
-  /// Evaluates unanimous or closest-match consensus and updates winner atomically.
+  /// Ends the session if the votes have decided a winner (see
+  /// [LgtmSession.decidedWinner]), writing `winner` and `status` and clearing
+  /// the group's active session atomically. Returns null while swiping should
+  /// go on.
   Future<SessionWinner?> checkAndDeclareWinner({
     required String sessionId,
     required LgtmSession session,

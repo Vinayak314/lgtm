@@ -15,13 +15,12 @@ import '../../widgets/states/lgtm_empty_state.dart';
 import '../../widgets/states/lgtm_error_state.dart';
 import '../../widgets/states/lgtm_loading_state.dart';
 import '../session/session_history_screen.dart';
-import '../session/session_setup_screen.dart';
 
 /// My Groups, the signed in landing page.
 ///
 /// The first group gets the full card with its members and past winners, the
 /// rest get the compact row from the design. Create and Join sit under the
-/// Start Session CTA.
+/// Group actions and past winners.
 class GroupsHubScreen extends StatefulWidget {
   const GroupsHubScreen({super.key});
 
@@ -54,15 +53,7 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
       case LgtmNavTab.groups:
         return;
       case LgtmNavTab.swipe:
-        final groups = LgtmGroupsScope.read(context).groups;
-        if (groups.isEmpty) {
-          _say('Create or join a group before starting a session.');
-          return;
-        }
-        Navigator.of(context).pushNamed(
-          LgtmRoutes.sessionSetup,
-          arguments: SessionSetupArgs(groupId: groups.first.id),
-        );
+        _say('Open a group to start or join its session.');
         return;
       case LgtmNavTab.matches:
         final groups = LgtmGroupsScope.read(context).groups;
@@ -166,19 +157,6 @@ class _GroupsHubScreenState extends State<GroupsHubScreen> {
           _CompactGroupCard(group: group, onTap: () => _openGroup(group)),
         ],
         const SizedBox(height: 36),
-        LgtmPrimaryButton(
-          label: 'Start New Session (Dinner)',
-          icon: Icons.add_circle_outline,
-          height: 60,
-          shadows: LgtmShadow.primarySoft,
-          onPressed: () {
-            Navigator.of(context).pushNamed(
-              LgtmRoutes.sessionSetup,
-              arguments: SessionSetupArgs(groupId: first.id),
-            );
-          },
-        ),
-        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(

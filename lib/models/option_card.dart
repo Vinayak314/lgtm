@@ -136,7 +136,7 @@ class MovieCard extends OptionCard {
   };
 }
 
-/// A restaurant or place fetched from Yelp / Foursquare / Overpass.
+/// A restaurant or place supplied by the places provider.
 class PlaceCard extends OptionCard {
   const PlaceCard({
     required super.id,

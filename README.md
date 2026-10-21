@@ -5,7 +5,9 @@
 ## Overview
 **LGTM** is a mobile app built with Flutter that helps groups of friends, roommates, or family members quickly agree on a shared activity — what movie to watch, or where to eat without the usual back-and-forth of a group chat. 
 
-Firebase authentication and group data are connected. Live session creation, voting, and results still need to be wired to the session repository before that flow is available.
+Firebase authentication, group data, live session creation, voting, and
+consensus results are connected. A device/emulator walkthrough is still needed
+to verify the complete two-device flow.
 
 ## Key Features
 - **Group Sessions:** Easily invite friends, roommates, or family to a shared decision-making session.
@@ -33,8 +35,24 @@ Both files are git-ignored on purpose: they are per machine, and `google-service
 
 ```bash
 flutter pub get
-flutter run
+flutter run --dart-define=TMDB_KEY=your_tmdb_key
 ```
+
+`TMDB_KEY` is a TMDB v3 API key and is only needed for movie sessions. Food
+sessions use five deterministic local mock places, so they do not require a
+Yelp key or network access. Pass `TMDB_KEY` with `--dart-define` for
+local/debug builds only; do not put the secret in Git, `pubspec.yaml`, or a
+checked-in source file. If the movie key is missing, the app shows a
+recoverable setup error instead of creating a session with an empty deck.
+
+Each mock food card includes a name, description, rating, price level, tags,
+distance, and image URL. The host stores this exact five-card deck in Firebase,
+so participants receive the same cards in the same order.
+
+Each group has at most one active session. The group owner starts a new
+session; other members join the active session's lobby from the group flow.
+Session creation and joining are intentionally unavailable from the home
+screen; open a group to access its session action.
 
 ## Firebase
 
@@ -70,6 +88,13 @@ sessions/{sid}      { groupId, hostId, status, category, radius, cards,
 ```
 
 `userGroups` exists because the database grants a query only when the whole queried path is readable. Querying `groups` would mean reading every group in the app.
+
+When an owner tries to leave a group with other members, LGTM blocks the
+operation until ownership is transferred (ownership changes are intentionally
+owner-only in the database rules). When the owner is the only member, the group
+and its invite-code index are deleted. For a non-owner, the departing member's
+`groups/{gid}/members/{uid}` and `userGroups/{uid}/{gid}` entries are cleaned
+up.
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.

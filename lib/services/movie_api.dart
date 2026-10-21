@@ -4,6 +4,15 @@ import 'package:http/http.dart' as http;
 
 import '../models/option_card.dart';
 
+class LgtmApiException implements Exception {
+  const LgtmApiException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// Fetches movie options from TMDB. Returns only provider results.
 class MovieApiService {
   MovieApiService({String? apiKey, http.Client? client})
@@ -26,7 +35,11 @@ class MovieApiService {
   };
 
   Future<List<MovieCard>> fetchMovieDeck({String? genre, int limit = 15}) async {
-    if (_apiKey.isEmpty) return [];
+    if (_apiKey.isEmpty) {
+      throw const LgtmApiException(
+        'TMDB is not configured. Add TMDB_KEY to the debug build.',
+      );
+    }
 
     try {
       final genreId = genre != null ? genreMap[genre.toLowerCase()] : null;
@@ -40,7 +53,11 @@ class MovieApiService {
         },
       );
       final response = await _client.get(uri);
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) {
+        throw LgtmApiException(
+          'TMDB could not load movies (HTTP ${response.statusCode}).',
+        );
+      }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final results = data['results'] as List<dynamic>? ?? [];
@@ -66,9 +83,16 @@ class MovieApiService {
         ));
         if (cards.length >= limit) break;
       }
+      if (cards.length < 3) {
+        throw const LgtmApiException(
+          'TMDB returned too few movies. Try again later.',
+        );
+      }
       return cards;
-    } catch (_) {
-      return [];
+    } on LgtmApiException {
+      rethrow;
+    } catch (error) {
+      throw LgtmApiException('Could not load movies: $error');
     }
   }
 }
