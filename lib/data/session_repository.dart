@@ -33,15 +33,10 @@ abstract class LgtmSessionRepository {
   Stream<LgtmSession?> watchSession(String sessionId);
 
   /// Allows a member to join the lobby before swiping begins.
-  Future<void> joinLobby({
-    required String sessionId,
-    required String userId,
-  });
+  Future<void> joinLobby({required String sessionId, required String userId});
 
   /// Host locks active participants and starts swiping (`status = active`).
-  Future<void> beginSwiping({
-    required String sessionId,
-  });
+  Future<void> beginSwiping({required String sessionId});
 
   /// Records a user's Yes/No swipe on a specific card.
   Future<void> submitVote({
@@ -57,7 +52,10 @@ abstract class LgtmSessionRepository {
     required String userId,
   });
 
-  /// Evaluates unanimous or closest-match consensus and updates winner atomically.
+  /// Ends the session if the votes have decided a winner (see
+  /// [LgtmSession.decidedWinner]), writing `winner` and `status` and clearing
+  /// the group's active session atomically. Returns null while swiping should
+  /// go on.
   Future<SessionWinner?> checkAndDeclareWinner({
     required String sessionId,
     required LgtmSession session,

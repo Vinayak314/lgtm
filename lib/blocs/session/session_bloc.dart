@@ -19,7 +19,14 @@ class SessionBloc {
        _currentUserId = currentUserId,
        _movieApi = movieApi ?? MovieApiService(),
        _placesApi = placesApi ?? PlacesApiService() {
-    _eventController.stream.listen(_handleEvent);
+    // asyncMap runs one handler at a time, so a handler that is waiting on
+    // the network can never emit a stale state over a newer one.
+    _eventController.stream
+        .asyncMap(_handleEvent)
+        .listen(
+          (_) {},
+          onError: (Object error) => _emit(SessionErrorState('$error')),
+        );
   }
 
   final LgtmSessionRepository _repository;
@@ -33,7 +40,14 @@ class SessionBloc {
   StreamSubscription<LgtmSession?>? _sessionSubscription;
 
   SessionState _currentState = const SessionLoadingState();
-  int _localIndex = 0;
+
+  /// Set once this device has asked for the current user to be marked
+  /// finished, so the write is not repeated on every update.
+  bool _finishRequested = false;
+
+  /// Why the host could not save the winner. Kept so the error stays on
+  /// screen instead of being retried on every update.
+  String? _declareError;
 
   /// Input sink for dispatching events.
   Sink<SessionEvent> get eventSink => _eventController.sink;
@@ -139,37 +153,23 @@ class SessionBloc {
   }
 
   Future<void> _onCardSwiped(CardSwipedEvent event) async {
-    try {
-      await _repository.submitVote(
-        sessionId: event.sessionId,
-        cardId: event.cardId,
-        userId: _currentUserId,
-        liked: event.liked,
-      );
+    // Swiping freezes once the session has moved on (a winner, or waiting).
+    if (_currentState is! SessionSwipingState) return;
 
-      _localIndex++;
-
-      if (_currentState is SessionSwipingState) {
-        final currentSwiping = _currentState as SessionSwipingState;
-
-        if (_localIndex >= currentSwiping.cards.length) {
-          await _repository.markUserFinished(
+    // The vote's local echo through watchSession moves the deck on, so the
+    // event queue does not wait for the server to acknowledge the write.
+    unawaited(
+      _repository
+          .submitVote(
             sessionId: event.sessionId,
+            cardId: event.cardId,
             userId: _currentUserId,
-          );
-        } else {
-          _emit(
-            SessionSwipingState(
-              session: currentSwiping.session,
-              currentIndex: _localIndex,
-              cards: currentSwiping.cards,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      _emit(SessionErrorState('Failed to submit vote: $e'));
-    }
+            liked: event.liked,
+          )
+          .catchError((Object e) {
+            _emit(SessionErrorState('Failed to submit vote: $e'));
+          }),
+    );
   }
 
   Future<void> _onSessionUpdated(SessionUpdatedEvent event) async {
@@ -179,61 +179,43 @@ class SessionBloc {
       return;
     }
 
-    // ---- Recover _localIndex from Firebase votes ----
-    // Count how many cards this user has already voted on so that a
-    // fresh bloc (e.g. after back-press) picks up where the user left off.
-    int votedCount = 0;
-    for (final entry in session.votes.entries) {
-      if (entry.value.containsKey(_currentUserId)) {
-        votedCount++;
-      }
-    }
-    _localIndex = votedCount;
-
     // ---- Check winner first (already declared in Firebase) ----
     if (session.winner != null) {
-      final winnerCard = session.cards.firstWhere(
-        (c) => c.id == session.winner!.cardId,
-        orElse: () => session.cards.first,
-      );
-      _emit(
-        SessionWonState(
-          session: session,
-          winnerCard: winnerCard,
-          winnerType: session.winner!.type,
-        ),
-      );
+      _emitWon(session, session.winner!);
       return;
     }
 
-    // ---- Host attempts to declare the winner ----
-    // Firebase rules only allow the host to write winner + status. Non-host
-    // participants will receive the finished snapshot through the stream.
-    // The key improvement: the host now attempts this on every stream update
-    // (including after rejoin), not just while continuously subscribed.
+    // ---- Host declares the winner as soon as the votes decide one ----
+    // A unanimous Yes ends the session straight away; the closest match only
+    // once everyone has finished. Firebase rules only allow the host to write
+    // winner + status, so other participants receive the finished snapshot
+    // through the stream. The host checks on every update, including after a
+    // rejoin, so a session that was decided while it was away still ends.
     if (session.status == SessionStatus.active &&
         session.hostId == _currentUserId &&
-        session.allParticipantsFinished) {
-      final declaredWinner = await _repository.checkAndDeclareWinner(
-        sessionId: session.id,
-        session: session,
-      );
-      if (declaredWinner != null) {
-        final finishedSession = session.copyWith(
-          status: SessionStatus.finished,
-          winner: declaredWinner,
+        session.decidedWinner != null) {
+      if (_declareError != null) {
+        _emit(SessionErrorState(_declareError!));
+        return;
+      }
+      try {
+        final declaredWinner = await _repository.checkAndDeclareWinner(
+          sessionId: session.id,
+          session: session,
         );
-        final winnerCard = finishedSession.cards.firstWhere(
-          (c) => c.id == declaredWinner.cardId,
-          orElse: () => finishedSession.cards.first,
-        );
-        _emit(
-          SessionWonState(
-            session: finishedSession,
-            winnerCard: winnerCard,
-            winnerType: declaredWinner.type,
-          ),
-        );
+        if (declaredWinner != null) {
+          _emitWon(
+            session.copyWith(
+              status: SessionStatus.finished,
+              winner: declaredWinner,
+            ),
+            declaredWinner,
+          );
+          return;
+        }
+      } catch (e) {
+        _declareError = 'Could not finish the session: $e';
+        _emit(SessionErrorState(_declareError!));
         return;
       }
     }
@@ -249,8 +231,11 @@ class SessionBloc {
         break;
 
       case SessionStatus.active:
-        if (session.finishedIds.contains(_currentUserId) ||
-            _localIndex >= session.cards.length) {
+        // Progress comes from the votes stored in Firebase, so a fresh bloc
+        // (e.g. after back-press) picks up on the first card not voted on.
+        final nextIndex = session.nextCardIndexFor(_currentUserId);
+        if (nextIndex == -1 || session.hasFinished(_currentUserId)) {
+          _markFinished(session);
           _emit(
             SessionWaitingState(
               session: session,
@@ -262,7 +247,7 @@ class SessionBloc {
           _emit(
             SessionSwipingState(
               session: session,
-              currentIndex: _localIndex,
+              currentIndex: nextIndex,
               cards: session.cards,
             ),
           );
@@ -281,6 +266,40 @@ class SessionBloc {
         );
         break;
     }
+  }
+
+  void _emitWon(LgtmSession session, SessionWinner winner) {
+    final winnerCard = session.cards.firstWhere(
+      (c) => c.id == winner.cardId,
+      orElse: () => session.cards.first,
+    );
+    _emit(
+      SessionWonState(
+        session: session,
+        winnerCard: winnerCard,
+        winnerType: winner.type,
+      ),
+    );
+  }
+
+  /// Marks the current user finished once they have voted on every card.
+  /// This runs from the stream rather than the swipe handler, so it still
+  /// happens when a vote's echo beats its acknowledgement, or when the app
+  /// was closed between the last swipe and the write.
+  void _markFinished(LgtmSession session) {
+    if (_finishRequested ||
+        session.hasFinished(_currentUserId) ||
+        !session.isParticipant(_currentUserId)) {
+      return;
+    }
+    _finishRequested = true;
+    unawaited(
+      _repository
+          .markUserFinished(sessionId: session.id, userId: _currentUserId)
+          .catchError((Object e) {
+            _emit(SessionErrorState('Failed to finish swiping: $e'));
+          }),
+    );
   }
 
   void _subscribeToSession(String sessionId) {

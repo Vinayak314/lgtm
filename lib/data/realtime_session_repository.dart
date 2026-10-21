@@ -127,8 +127,7 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
     // by subscribing to the stream. If they are NOT a participant,
     // they missed the lobby window.
     final participants = sessionMap['participants'];
-    final isParticipant = participants is Map &&
-        participants[userId] == true;
+    final isParticipant = participants is Map && participants[userId] == true;
 
     if (!isParticipant) {
       throw const LgtmSessionException(
@@ -173,111 +172,36 @@ class RealtimeSessionRepository implements LgtmSessionRepository {
     required String sessionId,
     required LgtmSession session,
   }) async {
-    if (!session.allParticipantsFinished) return null;
+    final winner = session.decidedWinner;
+    if (winner == null) return null;
 
-    final sessionRef = _sessionsRef.child(sessionId);
-
-    // All participants have voted. Prefer unanimous agreement, otherwise use
-    // the closest-match fallback.
-    final unanimousCard = session.findUnanimousCard();
-    if (unanimousCard != null) {
-      return _tryDeclareTransaction(
-        sessionRef,
-        cardId: unanimousCard,
-        type: WinnerType.unanimous,
-      );
-    }
-
-    final closest = session.closestMatchCard();
-    if (closest != null) {
-      return _tryDeclareTransaction(
-        sessionRef,
-        cardId: closest.id,
-        type: WinnerType.closest,
-      );
-    }
-
-    return null;
-  }
-
-  Future<SessionWinner?> _tryDeclareTransaction(
-    DatabaseReference sessionRef, {
-    required String cardId,
-    required WinnerType type,
-  }) async {
-    final result = await sessionRef.runTransaction((currentData) {
-      if (currentData == null) return Transaction.abort();
-
-      final map = Map<String, dynamic>.from(currentData as Map);
-      if (map['winner'] != null || map['status'] != SessionStatus.active.wire) {
-        return Transaction.abort();
-      }
-
-      final participants = _truthyKeys(map['participants']);
-      final finished = _truthyKeys(map['finished']);
-      if (participants.isEmpty || !finished.containsAll(participants)) {
-        return Transaction.abort();
-      }
-
-      map['winner'] = {'cardId': cardId, 'type': type.wire};
-      map['status'] = SessionStatus.finished.wire;
-
-      return Transaction.success(map);
+    // One atomic multi-location update, not a transaction on `sessions/{sid}`:
+    // the rules only allow that node to be written when it is created, so a
+    // whole-node write is rejected. Here each path is checked against its own
+    // rule, and `winner` is write-once, so a second declaration fails instead
+    // of overwriting the first. Ending the session and clearing the group's
+    // active session land together or not at all.
+    final groupId = session.groupId;
+    await _db.ref().update({
+      'sessions/$sessionId/winner': winner.toJson(),
+      'sessions/$sessionId/status': SessionStatus.finished.wire,
+      if (groupId.isNotEmpty) ...{
+        'groups/$groupId/activeSession': null,
+        'groups/$groupId/sessions/$sessionId': {
+          'activity': session.category == SessionCategory.movie
+              ? 'Movies'
+              : 'Food',
+          'winnerName': _winnerName(session, winner.cardId),
+          'date': _formatDate(session.createdAt),
+        },
+      },
     });
-
-    if (result.committed) {
-      final snap = result.snapshot;
-      if (snap.value is Map) {
-        final groupId = (snap.value as Map)['groupId']?.toString();
-        if (groupId != null && groupId.isNotEmpty) {
-          final winnerName = _winnerName(snap.value as Map, cardId);
-          final category = (snap.value as Map)['category']?.toString();
-          final date = _formatDate((snap.value as Map)['createdAt']);
-          final sessionId = sessionRef.key;
-          if (sessionId == null) {
-            throw const LgtmSessionException(
-              'The completed session has no identifier.',
-            );
-          }
-          await _groupsRef.child(groupId).update({
-            'activeSession': null,
-            'sessions/$sessionId': {
-              'activity': category == SessionCategory.movie.wire
-                  ? 'Movies'
-                  : 'Food',
-              'winnerName': winnerName,
-              'date': date,
-            },
-          });
-        }
-      }
-      return SessionWinner(cardId: cardId, type: type);
-    }
-    return null;
+    return winner;
   }
 
-  Set<String> _truthyKeys(Object? value) {
-    if (value is! Map) return <String>{};
-    return {
-      for (final entry in value.entries)
-        if (entry.value == true) entry.key.toString(),
-    };
-  }
-
-  String _winnerName(Map snapshot, String cardId) {
-    final cards = snapshot['cards'];
-    if (cards is List) {
-      for (final card in cards) {
-        if (card is Map && card['id']?.toString() == cardId) {
-          return card['title']?.toString() ?? 'Selected option';
-        }
-      }
-    } else if (cards is Map) {
-      for (final card in cards.values) {
-        if (card is Map && card['id']?.toString() == cardId) {
-          return card['title']?.toString() ?? 'Selected option';
-        }
-      }
+  String _winnerName(LgtmSession session, String cardId) {
+    for (final card in session.cards) {
+      if (card.id == cardId) return card.title;
     }
     return 'Selected option';
   }

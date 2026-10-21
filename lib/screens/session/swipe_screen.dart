@@ -7,6 +7,7 @@ import '../../app/router.dart';
 import '../../app/groups_store.dart';
 import '../../core/design_tokens.dart';
 import '../../models/session.dart';
+import 'waiting_screen.dart';
 
 class SwipeArgs {
   const SwipeArgs({
@@ -129,14 +130,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           );
         }
         if (state is SessionWaitingState) {
-          return Scaffold(
-            body: Center(
-              child: Text(
-                'Waiting for the group: '
-                '${state.finishedCount}/${state.totalParticipants}',
-              ),
-            ),
-          );
+          return WaitingScreen(state: state);
         }
         if (state is SessionWonState) {
           return Scaffold(
